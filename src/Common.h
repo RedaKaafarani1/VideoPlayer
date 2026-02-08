@@ -19,24 +19,24 @@ extern "C" {
 
 inline Logger& gLogger = Logger::instance("videoPlayer.log");
 
-//This is verbose, yes, but I would like to simplify working with ffmpeg api
-struct CustomDeleter {
-    template <typename T>
-    void operator() (T* ctx) const {
-        if (ctx) {
-            if constexpr (std::is_same_v<T, AVFormatContext>)
-                avformat_close_input(&ctx); //we free it this way since avformat_open_input is used 
-            if constexpr (std::is_same_v<T, AVCodecParameters>)
-                avcodec_parameters_free(&ctx);
-            if constexpr (std::is_same_v<T, AVCodec>) { /*do nothing*/ }
-            if constexpr (std::is_same_v<T, AVCodecContext>)
-                avcodec_free_context(&ctx);
-            if constexpr (std::is_same_v<T, AVPacket>)
-                av_packet_free(&ctx);
-            if constexpr (std::is_same_v<T, AVFrame>)
-                av_frame_free(&ctx);
+    //This is verbose, yes, but I would like to simplify working with ffmpeg api
+    struct CustomDeleter {
+        template <typename T>
+        void operator() (T* ctx) const noexcept {
+            if (ctx) { //ffmpeg normally checks if null anyway
+                if constexpr (std::is_same_v<T, AVFormatContext>)
+                    avformat_close_input(&ctx); //we free it this way since avformat_open_input is used 
+                else if constexpr (std::is_same_v<T, AVCodecParameters>)
+                    avcodec_parameters_free(&ctx);
+                else if constexpr (std::is_same_v<T, AVCodec>) { /*do nothing*/ }
+                else if constexpr (std::is_same_v<T, AVCodecContext>)
+                    avcodec_free_context(&ctx);
+                else if constexpr (std::is_same_v<T, AVPacket>)
+                    av_packet_free(&ctx);
+                else if constexpr (std::is_same_v<T, AVFrame>)
+                    av_frame_free(&ctx);
+            }
         }
-    }
 };
 
 enum class CodecType {

@@ -2,18 +2,12 @@ CXX := g++
 
 CXXFLAGS := -g -std=c++20 -Wall -Wextra -O0
 CXXFLAGS += -Isrc
-CXXFLAGS += $(shell pkg-config --cflags libavformat libavcodec libavutil libswscale libswresample)
-
-RAYLIB_DIR := raylib
-CXXFLAGS += -I$(RAYLIB_DIR)/include
+CXXFLAGS += $(shell pkg-config --cflags libavformat libavcodec libavutil libswscale libswresample raylib)
 
 LDFLAGS :=
-LDFLAGS += -Lraylib/lib -Wl,-rpath,'$$ORIGIN/raylib/lib'
-
 
 LIBS :=
-LIBS += $(shell pkg-config --libs libavformat libavcodec libavutil libswscale libswresample)
-LIBS += -lraylib -lm -ldl -lpthread -lX11 -lGL
+LIBS += $(shell pkg-config --libs libavformat libavcodec libavutil libswscale libswresample raylib)
 
 SRC_DIR   := src
 BUILD_DIR := build

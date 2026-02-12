@@ -2,12 +2,10 @@
 
 #include "../Common.h"
 
+//simple stream class to hold packet and frame data
 class Stream {
 public:
     Stream();
-    int readFrame(AVFormatContext* fmtCtx, const unsigned int codecIdx) const;
-    AVFrame* decodeFrame(AVCodecContext* codecCtx) const;
-
 
     AVPacket* getPacket() const { return _packet.get(); }
     AVFrame*  getFrame()  const { return _frame.get();  }

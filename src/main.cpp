@@ -1,5 +1,6 @@
 #include "decoder/DecoderCore.h"
 #include "logger/Logger.h"
+#include <libavutil/frame.h>
 
 int main()
 {
@@ -9,7 +10,7 @@ int main()
     
     DecoderCore decoder;
     decoder.openStream("resources/example_video_720p.mp4");
-    gLogger.log("Starting application");
+    gLogger.info("Starting application");
 
     auto* fmt = decoder.getFormatContext();
     std::cout << "Format: " << fmt->iformat->long_name << ", duration: " << fmt->duration << '\n';
@@ -31,30 +32,19 @@ int main()
                   << '\n';
     }
     
-    const Stream& stream = decoder.getStream();
-    //maybe use a map instead of vector for easier access?
-    const Codec& videoCodec = *std::find_if(codecs.begin(), codecs.end(), [](const Codec& codec){ return codec.getCodecType() == CodecType::VideoCodec; });
-    const unsigned int videoCodecIdx = videoCodec.getCodecIndex();
+    auto codec = decoder.getCodecByType(CodecType::VideoCodec);
+    if (!codec)
+    {
+        gLogger.error("Could not get codec");
+        return -1;
+    }
+    codec->get().openCodec();
 
-    int err = videoCodec.openCodec();
-    if (err < 0)
-        std::runtime_error("Error opening codec!");
-
-while (stream.readFrame(decoder.getFormatContext(), videoCodecIdx) >= 0)
-{
-        AVFrame* frame = nullptr;
-        if ((frame = stream.decodeFrame(videoCodec.getCodecContext())) != nullptr)
-        {
-            std::cout << "Frame " << av_get_picture_type_char(frame->pict_type)<< " ("
-                      << videoCodec.getCodecContext()->frame_num << ") "
-                      << "pts " << frame->pts << " dts " << frame->pkt_dts
-                      << " key_frame " << (frame->flags & AV_FRAME_FLAG_KEY)
-                      << '\n';
-        }
-
-        av_packet_unref(stream.getPacket());
-}
-
+    AVFrame* frame = nullptr; 
+    while ((frame = decoder.decodeNextFrame(codec->get())))
+    {     
+            gLogger.info("Frame {} ({}) pts {} dts {} key_frame {}", av_get_picture_type_char(frame->pict_type), codec->get().getCodecContext()->frame_num, frame->pts, frame->pkt_dts, (frame->flags & AV_FRAME_FLAG_KEY));
+    }
 
     return 0;
 }

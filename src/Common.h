@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <vector>
 #include <iostream>
+#include <functional>
 
 #include "logger/Logger.h"
 

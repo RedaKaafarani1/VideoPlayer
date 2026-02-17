@@ -1,6 +1,10 @@
 #include "DecoderCore.h"
 #include "Common.h"
 #include <libavcodec/avcodec.h>
+#include <libavutil/frame.h>
+#include <libavutil/pixfmt.h>
+#include <libswscale/swscale.h>
+#include <memory>
 
 void DecoderCore::openStream(std::string filename)
 {
@@ -85,6 +89,9 @@ AVFrame* DecoderCore::decodeNextFrame(const Codec& codec)
     AVCodecContext* codecCtx = codec.getCodecContext();  
 
     unsigned int codecIdx = codec.getCodecIndex();
+    
+    // Get vector of decoded frames
+    auto& decodedFrames = stream.getDecodedFrames();
 
     int err;
 
@@ -105,7 +112,52 @@ AVFrame* DecoderCore::decodeNextFrame(const Codec& codec)
             gLogger.error("Error receiving frame for codec {}", static_cast<int>(codecCtx->codec_id));
             return nullptr;
         }
-        // valid frame
+        // valid frame, clone it and store it
+        std::unique_ptr<AVFrame, CustomDeleter> clonedFrame(av_frame_clone(frame));
+        decodedFrames.emplace_back(std::move(clonedFrame));
         return frame;
     }
+}
+
+AVFrame* DecoderCore::convertFrameToRGB(const AVFrame* const source)
+{
+    if (!source)
+        return nullptr;
+
+    // assume this is stored in a container that takes ownership of the data
+    // and that will free it
+    AVFrame* rgbFrame = av_frame_alloc();
+    if (!rgbFrame)
+    {
+        gLogger.error("Could not allocate frame for conversion");
+        return nullptr;
+    }
+
+    rgbFrame->format = AV_PIX_FMT_RGB24;
+    rgbFrame->width = source->width;
+    rgbFrame->height = source->height;
+
+    if (av_frame_get_buffer(rgbFrame, 0) < 0)
+    {
+        gLogger.error("Could not allocate frame buffer data");
+        return nullptr;
+    }
+
+    swsCtx = sws_getCachedContext(
+            swsCtx,
+            source->width,
+            source->height,
+            static_cast<AVPixelFormat>(source->format),
+            rgbFrame->width,
+            rgbFrame->height,
+            static_cast<AVPixelFormat>(rgbFrame->format),
+            SWS_BILINEAR,
+            nullptr,
+            nullptr,
+            nullptr
+            );
+    
+    sws_scale(swsCtx, source->data, source->linesize, 0, source->height, rgbFrame->data, rgbFrame->linesize);
+
+    return rgbFrame;
 }

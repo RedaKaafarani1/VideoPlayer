@@ -2,9 +2,11 @@
 
 #include "Codec.h"
 #include "Stream.h"
+#include <libswscale/swscale.h>
 
 class DecoderCore {
 public:
+    ~DecoderCore() { if (swsCtx) sws_freeContext(swsCtx); };
     void openStream(std::string filename); 
 
     AVFormatContext* getFormatContext()         { return FormatContextPtr.get(); }
@@ -12,6 +14,7 @@ public:
     const Stream& getStream()             const { return stream; }
 
     AVFrame* decodeNextFrame(const Codec& codec);
+    AVFrame* convertFrameToRGB(const AVFrame* const yuvFrame);
     
     std::optional<std::reference_wrapper<const Codec>> getCodecByType(CodecType codecType) const;
 
@@ -24,4 +27,5 @@ private:
     Stream stream{};
     bool doneDecoding = false;
 
+    SwsContext* swsCtx = nullptr;
 };

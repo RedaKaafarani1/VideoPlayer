@@ -8,7 +8,7 @@ class App
 public:
     App() : appRender(WIDTH, HEIGHT) {}
     void InitializeApp() noexcept;
-    Render GetAppRender() noexcept { return appRender; }
+    Render& GetAppRender() noexcept { return appRender; }
 private:
     Render appRender;
 };

@@ -1,10 +1,5 @@
 #include "DecoderCore.h"
 #include "Common.h"
-#include <libavcodec/avcodec.h>
-#include <libavutil/frame.h>
-#include <libavutil/pixfmt.h>
-#include <libswscale/swscale.h>
-#include <memory>
 
 void DecoderCore::openStream(std::string filename)
 {
@@ -133,13 +128,14 @@ AVFrame* DecoderCore::convertFrameToRGB(const AVFrame* const source)
         return nullptr;
     }
 
-    rgbFrame->format = AV_PIX_FMT_RGB24;
+    rgbFrame->format = AV_PIX_FMT_RGBA;
     rgbFrame->width = source->width;
     rgbFrame->height = source->height;
 
     if (av_frame_get_buffer(rgbFrame, 0) < 0)
     {
         gLogger.error("Could not allocate frame buffer data");
+        av_frame_free(&rgbFrame);
         return nullptr;
     }
 

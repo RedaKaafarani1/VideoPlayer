@@ -6,7 +6,7 @@
 int main()
 {
     
-    DecoderCore decoder;
+    /*DecoderCore decoder;
     decoder.openStream("resources/example_video_720p.mp4");
     gLogger.info("Starting application");
 
@@ -56,6 +56,9 @@ int main()
     if (fps == 0.0)
         fps = av_q2d(fmt->streams[codec->get().getCodecIndex()]->r_frame_rate);
 
-    renderer.BeginRender(timeBase, fps);
+    renderer.BeginRender(timeBase, fps);*/
+
+    App application{};
+    application.RunAppLoop();
     return 0;
 }

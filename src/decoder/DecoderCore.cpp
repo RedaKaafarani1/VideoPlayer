@@ -1,19 +1,23 @@
 #include "DecoderCore.h"
 #include "Common.h"
+#include <libavcodec/avcodec.h>
+#include <libavutil/rational.h>
+#include <mutex>
+#include <stop_token>
 
-void DecoderCore::openStream(std::string filename)
+int DecoderCore::openStream(const std::string& filename)
 {
     gLogger.info("Opening video stream with file name {}", filename);
     AVFormatContext* tmp = nullptr;
     if (avformat_open_input(&tmp, filename.c_str(), nullptr, nullptr) < 0)
     {
-        gLogger.error("Could not open video file {}", filename);
-        throw std::runtime_error("Could not open video file");
+        return -1;
     }
     avformat_find_stream_info(tmp, nullptr);
     FormatContextPtr.reset(tmp);
 
     setCodecParameters();
+    return 0;
 }
 
 void DecoderCore::setCodecParameters()
@@ -85,31 +89,42 @@ AVFrame* DecoderCore::decodeNextFrame(const Codec& codec)
 
     unsigned int codecIdx = codec.getCodecIndex();
     
-    // Get vector of decoded frames
-    auto& decodedFrames = stream.getDecodedFrames();
-
     int err;
 
     while (true) {
         err = readFrame(*packet, codecIdx, *codecCtx);
         if (err < 0)
-            return nullptr; //we already logged, return nullptr;
+        {
+            if (avcodec_receive_frame(codecCtx, frame)==0)
+            {
+                return frame;
+            }
 
+            {
+                std::scoped_lock lock(queueMutex);
+                doneDecoding = true;
+            }
+            queueCondition.notify_all();
+            gLogger.info("Done decoding");
+            return nullptr;
+        }
         err = avcodec_receive_frame(codecCtx, frame);
         if (err == AVERROR(EAGAIN)) {
             // need more packets
             continue;
         } else if (err == AVERROR_EOF) {
             //no more output frames
-            doneDecoding = true;
+            {
+                std::scoped_lock lock(queueMutex);
+                doneDecoding = true;
+            }
+            queueCondition.notify_all();
+            gLogger.info("Done decoding");
             return nullptr;
         } else if (err < 0) {
             gLogger.error("Error receiving frame for codec {}", static_cast<int>(codecCtx->codec_id));
             return nullptr;
         }
-        // valid frame, clone it and store it
-        std::unique_ptr<AVFrame, CustomDeleter> clonedFrame(av_frame_clone(frame));
-        decodedFrames.emplace_back(std::move(clonedFrame));
         return frame;
     }
 }
@@ -156,4 +171,66 @@ AVFrame* DecoderCore::convertFrameToRGB(const AVFrame* const source)
     sws_scale(swsCtx, source->data, source->linesize, 0, source->height, rgbFrame->data, rgbFrame->linesize);
 
     return rgbFrame;
+}
+
+void DecoderCore::decodeVideoStream(std::stop_token stopToken)
+{
+    if (!doneDecoding)
+    {
+        AVFrame* frame = nullptr;
+        auto codec = getCodecByType(CodecType::VideoCodec);
+        if (!codec)
+        {
+            gLogger.error("Could not get codec");
+            return;
+        }
+        codec->get().openCodec(); 
+
+        while ((frame = decodeNextFrame(codec->get())) && !stopToken.stop_requested())
+        {
+            gLogger.info("Frame {} ({}) pts {} dts {} key_frame {}", av_get_picture_type_char(frame->pict_type), codec->get().getCodecContext()->frame_num, frame->pts, frame->pkt_dts, (frame->flags & AV_FRAME_FLAG_KEY));
+            AVFrame* rgbFrame = convertFrameToRGB(frame);
+            if (rgbFrame)
+            {
+                {
+                    std::scoped_lock lock(queueMutex);
+                    decodedRGBFrames.emplace(
+                            std::unique_ptr<AVFrame, CustomDeleter>(rgbFrame)
+                    ); 
+                }
+                queueCondition.notify_one();
+            }
+        }
+        queueCondition.notify_all();
+
+        return; 
+    }
+    // we didn't decode anything
+    gLogger.warn("Stream already decoded!");
+    return;
+}
+    
+std::unique_ptr<AVFrame, CustomDeleter> DecoderCore::getFrame()
+{
+    std::unique_lock lock(queueMutex);
+    queueCondition.wait(lock, [&](){return !decodedRGBFrames.empty() || doneDecoding; });
+    if (!decodedRGBFrames.empty())
+    {
+        auto frame = std::move(decodedRGBFrames.front());
+        decodedRGBFrames.pop();
+        return frame;
+    }
+    return nullptr;
+}
+
+double DecoderCore::getVideoTimeBase()
+{
+    auto codec = getCodecByType(CodecType::VideoCodec);
+    if (!codec)
+    {
+        gLogger.error("Could not get codec of type CodecType::VideoCodec");
+        return -1.0;
+    }
+
+    return av_q2d(FormatContextPtr.get()->streams[codec->get().getCodecIndex()]->time_base);
 }

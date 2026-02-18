@@ -5,20 +5,25 @@
 
 class Render {
 public:
-    Render (int width, int height) : isRendering(false), appWidth(width), appHeight(height) {}
+    Render (int width, int height) : isRendering(false), appWidth(width), appHeight(height)
+    {
+        frameTexture.width = 0;
+        frameTexture.height = 0;
+    }
     
     Render(const Render&) = delete;
     Render& operator=(const Render&) = delete;
 
-    Render(Render&&) noexcept = default;            // allow move
-    Render& operator=(Render&&) noexcept = default; // allow move
+    // allow move
+    Render(Render&&) noexcept = default;
+    Render& operator=(Render&&) noexcept = default; 
 
-    void BeginRender(const AVRational& timeBase, const double& fps) noexcept; 
+    void BeginRender() noexcept; 
     void InitializeFrameTexture(const int& width, const int& height) noexcept;
     void EndRender() noexcept; 
     void ResizeWindows(int newWidth, int newHeight) noexcept;
-
-    std::vector<std::unique_ptr<AVFrame, CustomDeleter>> rgbFrames;
+    bool IsStillRendering() noexcept { return isRendering; }
+    void DrawFrame(const AVFrame* frame);
 
 private:
     bool isRendering;

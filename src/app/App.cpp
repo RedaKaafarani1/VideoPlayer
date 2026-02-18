@@ -1,12 +1,11 @@
 #include "App.h"
-#include <ctime>
 
-void App::RunDecoder() noexcept
+int App::RunDecoder() noexcept
 {
     if (_videoFileName.empty())
     {
         gLogger.error("No video file to open");
-        return;
+        return -1;
     }
     gLogger.info("Starting application");
     // TODO: this should be used to display error messages to user
@@ -14,29 +13,30 @@ void App::RunDecoder() noexcept
     if (ret!=0)
     {
         gLogger.error("Could not open video file {}", _videoFileName);
-        return;
+        return -1;
     }
     //separate thread for decoding
     _decoder.startDecoding();
+    return 0;
 }
 
-void App::update(const double& timeBase)
+void App::Update(const double& timeBase)
 {
-    double currTime = GetTime() - playbackStartTime; 
-    
     if (!playbackFinished)
     {
         //This waits on the frame
         auto frame = _decoder.getFrame();
         if (frame)
         {
+            double currTime = std::chrono::duration<double>(Clock::now() - playbackStartTime).count();
             double frameTime = frame->pts * timeBase;
             double delay = frameTime - currTime;
             if (delay > 0)
             {
-                struct timespec ts{0, (long)(delay * 1e9)};
-                nanosleep(&ts, nullptr);
+                // wait before displaying next frame
+                std::this_thread::sleep_for(std::chrono::duration<double>(delay));
             }
+            //conserve last frame to display it indefinitely at the end
             _lastFrame = std::move(frame);
             _appRender.DrawFrame(_lastFrame.get());
         }
@@ -48,22 +48,34 @@ void App::update(const double& timeBase)
     }
     else
     {
+        // This is used in case we reach end of video or we had an error, so
+        // we display last frame or gray BG 
         if (_lastFrame)
             _appRender.DrawFrame(_lastFrame.get());
+        else
+            _appRender.DrawFrame(nullptr);
     }
 }
 
 void App::RunAppLoop() noexcept
 {
     _appRender.BeginRender();
+        
     if (!_videoFileName.empty())
-        RunDecoder();
+    {
+        int err = RunDecoder();
+        if (err != 0)
+            playbackFinished = true; //will display gray BG
+    }
 
-    playbackStartTime = GetTime();
+    // time base used to calculate frame time for display
+    playbackStartTime = Clock::now(); 
     double timeBase = _decoder.getVideoTimeBase(); 
+    gLogger.debug("Video time base = {}", timeBase);
+
     while (!WindowShouldClose() && _appRender.IsStillRendering())
     {
-        update(timeBase);
+        Update(timeBase);
     }
     
     _appRender.EndRender();

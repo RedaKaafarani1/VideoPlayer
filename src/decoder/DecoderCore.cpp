@@ -1,9 +1,5 @@
 #include "DecoderCore.h"
 #include "Common.h"
-#include <libavcodec/avcodec.h>
-#include <libavutil/rational.h>
-#include <mutex>
-#include <stop_token>
 
 int DecoderCore::openStream(const std::string& filename)
 {
@@ -26,6 +22,7 @@ void DecoderCore::setCodecParameters()
 
     for (unsigned int streamIdx = 0; streamIdx  < fmt->nb_streams; streamIdx++)
     {
+        //Codec is fully initialized in the constructor
         codecs.emplace_back(Codec(*FormatContextPtr.get(), streamIdx));
     }
 }
@@ -48,14 +45,19 @@ int DecoderCore::readFrame(AVPacket& packet, const unsigned int codecIdx, AVCode
     {
         ret = av_read_frame(FormatContextPtr.get(), &packet);
 
+        // ret < 0 will be handled outside the while block 
         if (ret < 0) break;
+        // if we have a packet that belongs to our stream, we break
+        // to handle it in the else block outside
         if (packet.stream_index == static_cast<int>(codecIdx)) break;
 
+        // otherwise we unref the packet
         av_packet_unref(&packet);
     }
 
     if (ret == AVERROR_EOF)
     {
+        //flush the decoder
         avcodec_send_packet(&codecCtx, nullptr);
         return -1;
     } 
@@ -66,6 +68,7 @@ int DecoderCore::readFrame(AVPacket& packet, const unsigned int codecIdx, AVCode
     } 
     else 
     {
+        // send the packet so we can receive a frame later
         ret = avcodec_send_packet(&codecCtx, &packet);
         av_packet_unref(&packet);
         if (ret < 0)
@@ -79,7 +82,8 @@ int DecoderCore::readFrame(AVPacket& packet, const unsigned int codecIdx, AVCode
 
 AVFrame* DecoderCore::decodeNextFrame(const Codec& codec) 
 {
-    //prevent further calls to this function if we are done decoding
+    // prevent further calls to this function if we are done decoding
+    // just in case
     if (doneDecoding)
         return nullptr;
     
@@ -95,11 +99,15 @@ AVFrame* DecoderCore::decodeNextFrame(const Codec& codec)
         err = readFrame(*packet, codecIdx, *codecCtx);
         if (err < 0)
         {
+            // if we are in this block, it doesn't mean we actually have an error
+            // so we try to receive buffered frames and return
+            // otherwise we finalize decoding and we return nullptr
             if (avcodec_receive_frame(codecCtx, frame)==0)
             {
                 return frame;
             }
 
+            //getFrame reads this, acquired the mutex before writing
             {
                 std::scoped_lock lock(queueMutex);
                 doneDecoding = true;
@@ -153,6 +161,9 @@ AVFrame* DecoderCore::convertFrameToRGB(const AVFrame* const source)
         av_frame_free(&rgbFrame);
         return nullptr;
     }
+
+    //copy pts which we will use for timing
+    rgbFrame->pts = source->pts;
 
     swsCtx = sws_getCachedContext(
             swsCtx,
@@ -213,6 +224,7 @@ void DecoderCore::decodeVideoStream(std::stop_token stopToken)
 std::unique_ptr<AVFrame, CustomDeleter> DecoderCore::getFrame()
 {
     std::unique_lock lock(queueMutex);
+    //wait for a frame or to finish decoding
     queueCondition.wait(lock, [&](){return !decodedRGBFrames.empty() || doneDecoding; });
     if (!decodedRGBFrames.empty())
     {
@@ -220,6 +232,7 @@ std::unique_ptr<AVFrame, CustomDeleter> DecoderCore::getFrame()
         decodedRGBFrames.pop();
         return frame;
     }
+    // no more frames to return, send nullptr to signal end
     return nullptr;
 }
 

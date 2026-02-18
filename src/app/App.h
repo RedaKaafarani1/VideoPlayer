@@ -3,12 +3,11 @@
 #include "../render/Render.h"
 #include "../decoder/DecoderCore.h"
 #include "../constants.h"
-#include "Common.h"
-#include <libavutil/frame.h>
 
 class App
 {
 public:
+    using Clock = std::chrono::steady_clock;
     App() : _appRender(WIDTH, HEIGHT) {}
 
     void RunAppLoop() noexcept;
@@ -16,13 +15,13 @@ public:
     Render& GetAppRender() noexcept { return _appRender; }
     DecoderCore& GetDecoder() noexcept { return _decoder; }
 private:
-    void RunDecoder() noexcept;
-    void update(const double& timeBase);
+    int RunDecoder() noexcept;
+    void Update(const double& timeBase);
 
     Render _appRender;
     DecoderCore _decoder;
-    std::unique_ptr<AVFrame, CustomDeleter> _lastFrame;
+    std::unique_ptr<AVFrame, CustomDeleter> _lastFrame {nullptr};
     std::string _videoFileName = "resources/example_video_720p.mp4";
-    double playbackStartTime;
+    Clock::time_point playbackStartTime;
     bool playbackFinished = false;
 };

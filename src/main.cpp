@@ -1,6 +1,3 @@
-#include "Common.h"
-#include "decoder/DecoderCore.h"
-#include "logger/Logger.h"
 #include "app/App.h"
 
 int main()
@@ -48,15 +45,7 @@ int main()
             gLogger.info("Frame {} ({}) pts {} dts {} key_frame {}", av_get_picture_type_char(frame->pict_type), codec->get().getCodecContext()->frame_num, frame->pts, frame->pkt_dts, (frame->flags & AV_FRAME_FLAG_KEY));
             AVFrame* rgbFrame = decoder.convertFrameToRGB(frame);
             renderer.rgbFrames.emplace_back(std::unique_ptr<AVFrame, CustomDeleter>(rgbFrame));
-    }
-
-    //get timebase
-    auto timeBase = fmt->streams[codec->get().getCodecIndex()]->time_base;
-    double fps = av_q2d(fmt->streams[codec->get().getCodecIndex()]->avg_frame_rate);
-    if (fps == 0.0)
-        fps = av_q2d(fmt->streams[codec->get().getCodecIndex()]->r_frame_rate);
-
-    renderer.BeginRender(timeBase, fps);*/
+    }*/ 
 
     App application{};
     application.RunAppLoop();

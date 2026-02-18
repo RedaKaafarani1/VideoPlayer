@@ -1,9 +1,7 @@
 #pragma once
 
 #include "Codec.h"
-#include "Common.h"
 #include "Stream.h"
-#include <stop_token>
 
     class DecoderCore {
     public:
@@ -16,7 +14,8 @@
         double getVideoTimeBase();
 
         void startDecoding() 
-        { 
+        {
+            //run dedicated decoder thread
             decoderThread = std::jthread(
                     [this](std::stop_token stopToken)
                     {

@@ -40,9 +40,12 @@ void Render::DrawFrame(const AVFrame* frame)
 {
     BeginDrawing();
     ClearBackground(GRAY);
-    if (frameTexture.width == 0 && frameTexture.height == 0)
-        InitializeFrameTexture(frame->width, frame->height);
-    UpdateTexture(frameTexture, frame->data[0]);
-    DrawTexture(frameTexture, 0, 0, WHITE);
+    if (frame)
+    {
+        if (frameTexture.width == 0 && frameTexture.height == 0)
+            InitializeFrameTexture(frame->width, frame->height);
+        UpdateTexture(frameTexture, frame->data[0]);
+        DrawTexture(frameTexture, 0, 0, WHITE);
+    }
     EndDrawing();
 }

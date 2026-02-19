@@ -11,6 +11,7 @@ public:
     App() : _appRender(WIDTH, HEIGHT) {}
 
     void RunAppLoop() noexcept;
+    int InitializeInternals() noexcept;
     
     Render& GetAppRender() noexcept { return _appRender; }
     DecoderCore& GetDecoder() noexcept { return _decoder; }

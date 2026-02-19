@@ -1,4 +1,21 @@
 #include "App.h"
+#include <raylib.h>
+
+int App::InitializeInternals() noexcept
+{
+    const auto& codec = _decoder.getCodecByType(CodecType::VideoCodec);
+    if (!codec)
+    {
+        gLogger.error("Could not get Codec of type CodecType::VideoCodec");
+        return -1;
+    }
+
+    //We assume codec context is available since the codec was returned
+    const auto& codecCtx = codec->get().getCodecContext();
+    gLogger.info("Video width = {}, Video height = {}", codecCtx->width, codecCtx->height);
+    _appRender.InitializeFrameTexture(codecCtx->width, codecCtx->height);
+    return 0;
+}
 
 int App::RunDecoder() noexcept
 {
@@ -66,7 +83,15 @@ void App::RunAppLoop() noexcept
         int err = RunDecoder();
         if (err != 0)
             playbackFinished = true; //will display gray BG
+        
+        //Initialize renderer mostly for now
+        err = InitializeInternals();
+        if (err != 0)
+            playbackFinished = true;
+        else
+         _appRender.AdjustRenderSize();
     }
+
 
     // time base used to calculate frame time for display
     playbackStartTime = Clock::now(); 
@@ -75,8 +100,12 @@ void App::RunAppLoop() noexcept
 
     while (!WindowShouldClose() && _appRender.IsStillRendering())
     {
+        if (IsWindowResized())
+            _appRender.UpdateRLWindowSize();
         Update(timeBase);
     }
     
     _appRender.EndRender();
 }
+
+

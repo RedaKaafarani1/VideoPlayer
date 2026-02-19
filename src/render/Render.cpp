@@ -1,5 +1,4 @@
 #include "Render.h"
-#include <libavutil/frame.h>
 #include <raylib.h>
 
 void Render::InitializeFrameTexture(const int& width, const int& height) noexcept
@@ -11,29 +10,47 @@ void Render::InitializeFrameTexture(const int& width, const int& height) noexcep
     img.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
     img.mipmaps = 1;
 
-    frameTexture = LoadTextureFromImage(img);
+    //These will be used for resizing calculations
+    renderWindow.videoSize.width  = width;
+    renderWindow.videoSize.height = height;
+    // Rectangle of source (video) which has original resolution of the video
+    // and won't change
+    renderWindow.source = {0.0, 0.0, width*1.0f, height*1.0f};
+    //destination rectangle, it uses GetVideoDrawingRectangle, so it assumes
+    //that windowSize is already set.
+    renderWindow.destination = renderWindow.GetVideoDrawingRectangle();
+
+    renderWindow.frameTexture = LoadTextureFromImage(img);
+}
+
+//helper function to get monitor size
+static Render::RenderWindow::Size GetMonitorSize()
+{
+    int monitor = GetCurrentMonitor();
+    return {
+        GetMonitorWidth(monitor),
+        GetMonitorHeight(monitor)
+    };
 }
 
 void Render::BeginRender() noexcept
 {
-    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
+    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
 
-    InitWindow(appWidth, appHeight, "RTSP Player");
+    InitWindow(renderWindow.windowSize.width, renderWindow.windowSize.height, "RTSP Player");
+
+    RenderWindow::Size monitor = GetMonitorSize();
+    SetWindowMinSize(renderWindow.minWindowSize.width, renderWindow.minWindowSize.height);
+    SetWindowMaxSize(monitor.width, monitor.height);
 
     isRendering = true;
 }
 
 void Render::EndRender() noexcept
 {
-    UnloadTexture(frameTexture); 
+    UnloadTexture(renderWindow.frameTexture); 
     isRendering = false;
     CloseWindow();
-}
-
-void Render::ResizeWindows(int newWidth, int newHeight) noexcept
-{
-    appWidth = newWidth;
-    appHeight = newHeight;
 }
 
 void Render::DrawFrame(const AVFrame* frame)
@@ -42,10 +59,68 @@ void Render::DrawFrame(const AVFrame* frame)
     ClearBackground(GRAY);
     if (frame)
     {
-        if (frameTexture.width == 0 && frameTexture.height == 0)
-            InitializeFrameTexture(frame->width, frame->height);
-        UpdateTexture(frameTexture, frame->data[0]);
-        DrawTexture(frameTexture, 0, 0, WHITE);
+        //TODO: separate ffmpeg logic from render, make just take raw data
+        //instead of frame?
+        UpdateTexture(renderWindow.frameTexture, frame->data[0]);
+        //DrawTexture(renderWindow.frameTexture, x, y, WHITE);
+        DrawTexturePro(renderWindow.frameTexture, renderWindow.source, renderWindow.destination, {0,0}, 0, WHITE);
     }
     EndDrawing();
+}
+
+void Render::UpdateRLWindowSize() noexcept
+{
+    RenderWindow::Size newSize;
+    newSize.width  = GetScreenWidth();
+    newSize.height = GetScreenHeight();
+
+    renderWindow.SetRLWindowSize(newSize.width, newSize.height);
+    //window size changed, update destination to scale video if needed
+    renderWindow.destination = renderWindow.GetVideoDrawingRectangle();
+}
+
+void Render::RenderWindow::AdjustRenderSize() noexcept
+{
+    Size monitorSize = GetMonitorSize();
+
+    if (videoSize.width  <= monitorSize.width &&
+        videoSize.height <= monitorSize.height)
+    {
+        //update internal memory with window size
+        SetRLWindowSize(videoSize.width, videoSize.height);
+        //change raylib window size
+        SetWindowSize(videoSize.width, videoSize.height); 
+        return;
+    }
+
+    // if video is larger, we need to scale down to fit our monitor
+    double scale = std::min(
+            monitorSize.width / ((1.0)*videoSize.width),
+            monitorSize.height / ((1.0)*videoSize.height)
+    );
+
+    Size newSize {static_cast<int>(videoSize.width*scale),
+                  static_cast<int>(videoSize.height*scale)
+                 };
+
+    SetRLWindowSize(newSize.width, newSize.height);
+    SetWindowSize(newSize.width, newSize.height);
+}
+
+Rectangle Render::RenderWindow::GetVideoDrawingRectangle() noexcept
+{
+    float scale = std::min(
+            windowSize.width / ((1.0f) * videoSize.width),
+            windowSize.height / ((1.0f) * videoSize.height)
+    );
+    //only scale down
+    scale = std::min(scale, 1.0f);
+    float drawWidth = videoSize.width * scale;
+    float drawHeight = videoSize.height* scale;
+
+    return {(windowSize.width*1.0f - drawWidth)/2.0f,
+            (windowSize.height*1.0f - drawHeight)/2.0f,
+            drawWidth,
+            drawHeight
+    };
 }

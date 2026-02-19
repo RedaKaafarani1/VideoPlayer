@@ -5,10 +5,44 @@
 
 class Render {
 public:
-    Render (int width, int height) : isRendering(false), appWidth(width), appHeight(height)
+    struct RenderWindow {
+        struct Size {
+            int width;
+            int height;
+        };
+
+        //constant
+        constexpr static Size minWindowSize {640, 360}; 
+
+        // called when a video is first loaded
+        void AdjustRenderSize() noexcept;
+        // this should be called on every windows resize to keep 
+        // internal state up to date
+        void SetRLWindowSize(const int& width, const int& height)
+        {
+            gLogger.debug("Raylib window {}x{}", width, height);
+            windowSize.width = width;
+            windowSize.height = height;
+        }
+
+        Rectangle GetVideoDrawingRectangle() noexcept;
+
+        // actual window size (raylib screen)
+        Size windowSize;
+        // video size
+        Size videoSize;
+        //texture to hold frame data, it has the size of the video
+        Texture2D frameTexture;
+        // source rectangle having resolution of video
+        Rectangle source;
+        // destination rectangle having resolution of screen
+        Rectangle destination;
+    };
+
+    Render (const int& width, const int& height) 
     {
-        frameTexture.width = 0;
-        frameTexture.height = 0;
+        renderWindow.SetRLWindowSize(width, height);
+        isRendering = false;
     }
     
     Render(const Render&) = delete;
@@ -21,13 +55,12 @@ public:
     void BeginRender() noexcept; 
     void InitializeFrameTexture(const int& width, const int& height) noexcept;
     void EndRender() noexcept; 
-    void ResizeWindows(int newWidth, int newHeight) noexcept;
     bool IsStillRendering() noexcept { return isRendering; }
     void DrawFrame(const AVFrame* frame);
+    void AdjustRenderSize() noexcept { renderWindow.AdjustRenderSize(); } 
+    void UpdateRLWindowSize() noexcept; 
 
 private:
     bool isRendering;
-    int appWidth;
-    int appHeight;
-    Texture2D frameTexture;
+    RenderWindow renderWindow;
 };

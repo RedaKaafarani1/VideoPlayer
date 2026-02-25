@@ -1,7 +1,5 @@
 #include "App.h"
 #include "Common.h"
-#include <atomic>
-#include <raylib.h>
 
 int App::InitializeInternals() noexcept
 {
@@ -62,7 +60,7 @@ void App::Update(const double& timeBase)
             _appRender.DrawFrame(_lastFrame.get());
         }
         else {
-            // we are done decoding
+            //Playback is done
             playbackFinished = true;
             gLogger.info("Playback finished");
         }
@@ -109,6 +107,11 @@ void App::RunAppLoop() noexcept
     {
         if (IsWindowResized())
             _appRender.UpdateRLWindowSize();
+        if (IsKeyPressed(KEY_R))
+        {
+            _decoder.seekFrame(0);
+            playbackFinished = false;
+        }
         Update(timeBase);
     }
     

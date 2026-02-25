@@ -62,7 +62,6 @@ void Render::DrawFrame(const AVFrame* frame)
         //TODO: separate ffmpeg logic from render, make just take raw data
         //instead of frame?
         UpdateTexture(renderWindow.frameTexture, frame->data[0]);
-        //DrawTexture(renderWindow.frameTexture, x, y, WHITE);
         DrawTexturePro(renderWindow.frameTexture, renderWindow.source, renderWindow.destination, {0,0}, 0, WHITE);
     }
     EndDrawing();
@@ -118,6 +117,7 @@ Rectangle Render::RenderWindow::GetVideoDrawingRectangle() noexcept
     float drawWidth = videoSize.width * scale;
     float drawHeight = videoSize.height* scale;
 
+    //we want to center the video and draw it scaled down to drawWidth and drawHeight
     return {(windowSize.width*1.0f - drawWidth)/2.0f,
             (windowSize.height*1.0f - drawHeight)/2.0f,
             drawWidth,

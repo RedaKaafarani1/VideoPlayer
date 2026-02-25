@@ -50,3 +50,8 @@ enum class CodecType {
     VideoCodec,
     AudioCodec
 };
+
+enum class PlayerState : uint8_t {
+    None,
+    DecoderFailed,
+};

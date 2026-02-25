@@ -1,4 +1,6 @@
 #include "App.h"
+#include "Common.h"
+#include <atomic>
 #include <raylib.h>
 
 int App::InitializeInternals() noexcept
@@ -33,13 +35,15 @@ int App::RunDecoder() noexcept
         return -1;
     }
     //separate thread for decoding
+    gLogger.info("Starting decoding process in separate thread");
     _decoder.startDecoding();
     return 0;
 }
 
 void App::Update(const double& timeBase)
 {
-    if (!playbackFinished)
+    PlayerState currState = _playerState.load(std::memory_order_acquire);
+    if (!playbackFinished && !(currState == PlayerState::DecoderFailed))
     {
         //This waits on the frame
         auto frame = _decoder.getFrame();
@@ -76,10 +80,13 @@ void App::Update(const double& timeBase)
 
 void App::RunAppLoop() noexcept
 {
+    // Initializes raylib related stuff 
     _appRender.BeginRender();
-        
+     
+    //TODO: this is temporary, we should be able to change video file
     if (!_videoFileName.empty())
     {
+        // opens stream and runs the decoding loop in a separate thread
         int err = RunDecoder();
         if (err != 0)
             playbackFinished = true; //will display gray BG
@@ -92,11 +99,11 @@ void App::RunAppLoop() noexcept
          _appRender.AdjustRenderSize();
     }
 
-
     // time base used to calculate frame time for display
     playbackStartTime = Clock::now(); 
     double timeBase = _decoder.getVideoTimeBase(); 
     gLogger.debug("Video time base = {}", timeBase);
+
 
     while (!WindowShouldClose() && _appRender.IsStillRendering())
     {

@@ -20,9 +20,15 @@ Codec::Codec(AVFormatContext& formatCtx, const unsigned int streamIdx)
     
     //TODO: add support for more types
     if (_codecParams->codec_type == AVMEDIA_TYPE_VIDEO)
+    {
         _codecType = CodecType::VideoCodec;
+        gLogger.info("Video Codec: resolution {}x{}", _codecParams->width, _codecParams->height);
+    }
     else if (_codecParams->codec_type == AVMEDIA_TYPE_AUDIO)
+    {
         _codecType = CodecType::AudioCodec;
+        gLogger.info("Audio Codec: {} channels, sample rate {}", _codecParams->ch_layout.nb_channels, _codecParams->sample_rate);
+    }
     _codecIdx = streamIdx;
 
     const AVCodec* avCodec = avcodec_find_decoder(_codecParams.get()->codec_id);
@@ -46,6 +52,7 @@ Codec::Codec(AVFormatContext& formatCtx, const unsigned int streamIdx)
         gLogger.error("Could not get context from parameters for codec with index {}", streamIdx);
         throw std::runtime_error("Could not get context from parameters");
     }
+    gLogger.info("Codec {} ID {} bitrate {}", _codec->long_name, static_cast<int>(_codec->id), _codecParams->bit_rate); 
     gLogger.info("Finalized setting up codec with index {}", streamIdx);
 }
 

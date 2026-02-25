@@ -1,5 +1,6 @@
 #include "DecoderCore.h"
 #include "Common.h"
+#include <atomic>
 
 int DecoderCore::openStream(const std::string& filename)
 {
@@ -107,7 +108,7 @@ AVFrame* DecoderCore::decodeNextFrame(const Codec& codec)
                 return frame;
             }
 
-            //getFrame reads this, acquired the mutex before writing
+            //getFrame reads this, acquire the mutex before writing
             {
                 std::scoped_lock lock(queueMutex);
                 doneDecoding = true;
@@ -192,10 +193,19 @@ void DecoderCore::decodeVideoStream(std::stop_token stopToken)
         auto codec = getCodecByType(CodecType::VideoCodec);
         if (!codec)
         {
-            gLogger.error("Could not get codec");
+            gLogger.error("Could not get codec of type CodecType::VideoCodec");
+            _state.store(PlayerState::DecoderFailed, std::memory_order_release);
             return;
         }
-        codec->get().openCodec(); 
+        
+        gLogger.info("Starting decoding process");
+        int ret = codec->get().openCodec(); 
+        if (!ret )
+        {
+            gLogger.error("Could not open codec of type CodecType::VideoCodec");
+            _state.store(PlayerState::DecoderFailed, std::memory_order_release);
+            return;
+        }
 
         while ((frame = decodeNextFrame(codec->get())) && !stopToken.stop_requested())
         {

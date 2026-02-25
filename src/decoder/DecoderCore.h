@@ -1,10 +1,12 @@
 #pragma once
 
 #include "Codec.h"
+#include "Common.h"
 #include "Stream.h"
 
     class DecoderCore {
     public:
+        DecoderCore(std::atomic<PlayerState>& playerState) : _state(playerState) {}
         ~DecoderCore() { if (swsCtx) sws_freeContext(swsCtx); };
         int openStream(const std::string& filename); 
 
@@ -38,6 +40,7 @@ private:
     std::vector<Codec> codecs;
     Stream stream{};
     bool doneDecoding = false;
+    std::atomic<PlayerState>& _state;
 
     SwsContext* swsCtx = nullptr;
     std::mutex queueMutex;

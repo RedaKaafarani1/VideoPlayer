@@ -62,7 +62,7 @@ void App::Update(const double& timeBase)
             }
             //conserve last frame to display it indefinitely at the end
             _lastFrame = std::move(frame);
-            _appRender.DrawFrame(_lastFrame.get());
+            _appRender.DrawFrame(_lastFrame.get()->data[0]);
         }
         else {
             //Playback is done
@@ -75,7 +75,7 @@ void App::Update(const double& timeBase)
         // This is used in case we reach end of video or we had an error, so
         // we display last frame or gray BG 
         if (_lastFrame)
-            _appRender.DrawFrame(_lastFrame.get());
+            _appRender.DrawFrame(_lastFrame.get()->data[0]);
         else
             _appRender.DrawFrame(nullptr);
     }

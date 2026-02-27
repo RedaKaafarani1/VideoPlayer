@@ -1,8 +1,15 @@
 #pragma once
 
 #include "Codec.h"
-#include "Common.h"
 #include "Stream.h"
+#include <thread>
+#include <condition_variable>
+#include <queue>
+#include <mutex>
+
+extern "C" {
+#include <libswscale/swscale.h>
+}
 
 class DecoderCore {
 public:
@@ -17,8 +24,7 @@ public:
 
     AVFormatContext* getFormatContext() const   { return FormatContextPtr.get(); }
     const std::vector<Codec>& getCodecs() const { return codecs; } 
-    const Stream& getStream()             const { return stream; }
-    double getVideoTimeBase();
+    double getVideoTimeBase() const;
 
     void startDecoding() 
     {

@@ -2,6 +2,16 @@
 
 #include "../Common.h"
 
+#include "../logger/GLogger.h"
+
+//forward declarations
+struct AVCodecParameters;
+struct AVCodecContext;
+struct AVCodec;
+struct AVFormatContext;
+
+#include "FFMpegDeleter.h"
+
 class Codec {
 public:
     // all the logic is done here. This is called from DecoderCore when filling

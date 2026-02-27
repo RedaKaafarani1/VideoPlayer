@@ -1,5 +1,4 @@
 #include "Render.h"
-#include <raylib.h>
 
 void Render::InitializeFrameTexture(const int& width, const int& height) noexcept
 {
@@ -53,15 +52,13 @@ void Render::EndRender() noexcept
     CloseWindow();
 }
 
-void Render::DrawFrame(const AVFrame* frame)
+void Render::DrawFrame(const uint8_t* frameData)
 {
     BeginDrawing();
     ClearBackground(GRAY);
-    if (frame)
+    if (frameData)
     {
-        //TODO: separate ffmpeg logic from render, make just take raw data
-        //instead of frame?
-        UpdateTexture(renderWindow.frameTexture, frame->data[0]);
+        UpdateTexture(renderWindow.frameTexture, frameData);
         DrawTexturePro(renderWindow.frameTexture, renderWindow.source, renderWindow.destination, {0,0}, 0, WHITE);
     }
     EndDrawing();

@@ -1,4 +1,9 @@
 #include "Stream.h"
+#include "../logger/GLogger.h"
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+}
 
 Stream::Stream()
 {

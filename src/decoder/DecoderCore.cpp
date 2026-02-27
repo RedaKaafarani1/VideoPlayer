@@ -1,5 +1,4 @@
 #include "DecoderCore.h"
-#include "Common.h"
 
 int DecoderCore::openStream(const std::string& filename)
 {
@@ -99,9 +98,7 @@ AVFrame* DecoderCore::decodeNextFrame(const Codec& codec)
         err = readFrame(*packet, codecIdx, *codecCtx);
         if (err < 0)
         {
-            // if we are in this block, it doesn't mean we actually have an error
-            // so we try to receive buffered frames and return
-            // otherwise we finalize decoding and we return nullptr
+            // if we are in this block, it doesn't mean we actually have an error so we try to receive buffered frames and return otherwise we finalize decoding and we return nullptr
             if (avcodec_receive_frame(codecCtx, frame)==0)
             {
                 return frame;
@@ -265,7 +262,7 @@ void DecoderCore::decodeVideoStream(std::stop_token stopToken)
 std::unique_ptr<AVFrame, CustomDeleter> DecoderCore::getFrame()
 {
     std::unique_lock lock(queueMutex);
-    //wait for a frame or to finish decoding
+    //wait for a frame, done decoding or stop request
     queueCondition.wait(lock, [&](){return !decodedRGBFrames.empty() || doneDecoding || stopRequested.load(); });
     if (!decodedRGBFrames.empty())
     {
@@ -277,7 +274,7 @@ std::unique_ptr<AVFrame, CustomDeleter> DecoderCore::getFrame()
     return nullptr;
 }
 
-double DecoderCore::getVideoTimeBase()
+double DecoderCore::getVideoTimeBase() const
 {
     auto codec = getCodecByType(CodecType::VideoCodec);
     if (!codec)

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "raylib.h"
-#include "Common.h"
+#include "../logger/GLogger.h"
 
 class Render {
 public:
@@ -56,7 +56,7 @@ public:
     void InitializeFrameTexture(const int& width, const int& height) noexcept;
     void EndRender() noexcept; 
     bool IsStillRendering() noexcept { return isRendering; }
-    void DrawFrame(const AVFrame* frame);
+    void DrawFrame(const uint8_t* frameData);
     void AdjustRenderSize() noexcept { renderWindow.AdjustRenderSize(); } 
     void UpdateRLWindowSize() noexcept; 
 

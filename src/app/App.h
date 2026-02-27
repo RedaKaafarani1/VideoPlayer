@@ -2,8 +2,6 @@
 
 #include "../render/Render.h"
 #include "../decoder/DecoderCore.h"
-#include "../constants.h"
-#include "Common.h"
 
 class App
 {

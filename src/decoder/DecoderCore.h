@@ -8,13 +8,14 @@ class DecoderCore {
 public:
     DecoderCore(std::atomic<PlayerState>& playerState) : _state(playerState) {}
     ~DecoderCore() { 
+        if (swsCtx) sws_freeContext(swsCtx);
+        // object is being destroyed, notify all conditions so the thread can stop
         stopRequested.store(true, std::memory_order_release);
         queueCondition.notify_all();
         controlCondition.notify_all();
-        if (swsCtx) sws_freeContext(swsCtx);
     };
 
-    AVFormatContext* getFormatContext()         { return FormatContextPtr.get(); }
+    AVFormatContext* getFormatContext() const   { return FormatContextPtr.get(); }
     const std::vector<Codec>& getCodecs() const { return codecs; } 
     const Stream& getStream()             const { return stream; }
     double getVideoTimeBase();
@@ -36,6 +37,7 @@ public:
     std::unique_ptr<AVFrame, CustomDeleter> getFrame();
     std::optional<std::reference_wrapper<const Codec>> getCodecByType(CodecType codecType) const;
     void seekFrame(int64_t pts) noexcept;
+    int64_t getFirstFramePTS() const noexcept { return _firstFramePTS; }
 
 private:
     int readFrame(AVPacket& packet, const unsigned int codecIdx, AVCodecContext& codecCtx) const;
@@ -46,6 +48,7 @@ private:
     std::vector<Codec> codecs;
     Stream stream{};
     bool doneDecoding = false;
+    int64_t _firstFramePTS{ AV_NOPTS_VALUE };
     std::atomic<PlayerState>& _state;
 
     SwsContext* swsCtx = nullptr;

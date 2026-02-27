@@ -224,7 +224,9 @@ void DecoderCore::decodeVideoStream(std::stop_token stopToken)
         if (doneDecoding)
         {
             std::unique_lock lock(controlMutex);
-            controlCondition.wait(lock, [&](){ return seekRequested.load() || stopToken.stop_requested(); });
+            controlCondition.wait(lock, [&](){ 
+                return seekRequested.load() || stopToken.stop_requested() || stopRequested.load();
+            });
             continue;
         } 
 
@@ -239,6 +241,14 @@ void DecoderCore::decodeVideoStream(std::stop_token stopToken)
         {
             {
                 std::scoped_lock lock(queueMutex);
+                //set this here when the mutex is locked, we will be using it in the app thread
+                // _firstFramePTS is not atomic since we synchronize on queueMutex
+                if (_firstFramePTS == AV_NOPTS_VALUE)
+                {
+                        _firstFramePTS = frame->pts;
+                        if (_firstFramePTS == AV_NOPTS_VALUE)
+                            _firstFramePTS = frame->best_effort_timestamp; // fall back in case pts not available
+                }
                 decodedRGBFrames.emplace(
                         std::unique_ptr<AVFrame, CustomDeleter>(rgbFrame)
                 ); 
@@ -246,6 +256,7 @@ void DecoderCore::decodeVideoStream(std::stop_token stopToken)
             queueCondition.notify_one();
         }
     }
+    // notify all conditions
     queueCondition.notify_all();
     controlCondition.notify_all();
     return; 

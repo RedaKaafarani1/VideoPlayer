@@ -45,10 +45,15 @@ void App::Update(const double& timeBase)
     {
         //This waits on the frame
         auto frame = _decoder.getFrame();
+        //after getFrame, we are sure the first frame pts is set (if all is good), we can safely use it
+        auto firstFramePTS = _decoder.getFirstFramePTS();
         if (frame)
         {
             double currTime = std::chrono::duration<double>(Clock::now() - playbackStartTime).count();
-            double frameTime = frame->pts * timeBase;
+            //ensure we have a valid timestamp if possible
+            auto currPTS = (frame->pts != AV_NOPTS_VALUE) ? frame->pts : frame->best_effort_timestamp;
+            // calculate frame time based on offset from first frame pts, in case it's not equal to 0
+            double frameTime = (currPTS - firstFramePTS) * timeBase;
             double delay = frameTime - currTime;
             if (delay > 0)
             {

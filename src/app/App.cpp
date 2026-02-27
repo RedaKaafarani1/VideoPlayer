@@ -1,5 +1,6 @@
 #include "App.h"
 #include "Common.h"
+#include <raylib.h>
 
 int App::InitializeInternals() noexcept
 {
@@ -41,7 +42,7 @@ int App::RunDecoder() noexcept
 void App::Update(const double& timeBase)
 {
     PlayerState currState = _playerState.load(std::memory_order_acquire);
-    if (!_playbackController.IsPlaybackFinished() && !(currState == PlayerState::DecoderFailed))
+    if (!_playbackController.IsPlaybackFinished() && !_playbackController.IsPlaybackPaused()&& !(currState == PlayerState::DecoderFailed))
     {
         //This waits on the frame
         auto frame = _decoder.getFrame();
@@ -49,7 +50,8 @@ void App::Update(const double& timeBase)
         auto firstFramePTS = _decoder.getFirstFramePTS();
         if (frame)
         {
-            double currTime = _playbackController.GetTimeSinceStart(); 
+            // This function accounts for paused time
+            double currTime = _playbackController.GetEffectivePlaybackTime(); 
             //ensure we have a valid timestamp if possible
             auto currPTS = (frame->pts != AV_NOPTS_VALUE) ? frame->pts : frame->best_effort_timestamp;
             // calculate frame time based on offset from first frame pts, in case it's not equal to 0
@@ -115,8 +117,13 @@ void App::RunAppLoop() noexcept
         if (IsKeyPressed(KEY_R))
         {
             _decoder.seekFrame(0);
-            _playbackController.SetPlaybackFinished(false);
+            // this function resets paused time, playbackFinished and playbackPaused states
+            _playbackController.ResetInternalState();
+            _playbackController.StartPlaybackTimer();
         }
+        // if playback is finished, logically we cannot pause
+        if (IsKeyPressed(KEY_SPACE) && !_playbackController.IsPlaybackFinished())
+            _playbackController.TogglePause();
         Update(timeBase);
     }
     

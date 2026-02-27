@@ -59,7 +59,13 @@ void Render::DrawFrame(const uint8_t* frameData)
     if (frameData)
     {
         UpdateTexture(renderWindow.frameTexture, frameData);
-        DrawTexturePro(renderWindow.frameTexture, renderWindow.source, renderWindow.destination, {0,0}, 0, WHITE);
+        DrawTexturePro(renderWindow.frameTexture,
+                       renderWindow.source,
+                       renderWindow.destination,
+                       {0,0},
+                       0,
+                       WHITE
+        );
     }
     EndDrawing();
 }

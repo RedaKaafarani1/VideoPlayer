@@ -18,7 +18,7 @@ public:
         void AdjustRenderSize() noexcept;
         // this should be called on every windows resize to keep 
         // internal state up to date
-        void SetRLWindowSize(const int& width, const int& height)
+        void SetRLWindowSize(const int& width, const int& height) noexcept
         {
             gLogger.debug("Raylib window {}x{}", width, height);
             windowSize.width = width;

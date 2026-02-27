@@ -27,6 +27,7 @@ public:
     Codec& operator=(Codec&&) = default;
 
     //These are here if ever needed for access to codec information
+    //we don't really abstract away ffmpeg, but it's not really the goal
     AVCodecParameters* getCodecParams()  const { return _codecParams.get(); }
     AVCodecContext*    getCodecContext() const { return _codecCtx.get();    }
     const AVCodec*     getCodec()        const { return _codec.get();       }

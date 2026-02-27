@@ -41,7 +41,7 @@ int App::RunDecoder() noexcept
 void App::Update(const double& timeBase)
 {
     PlayerState currState = _playerState.load(std::memory_order_acquire);
-    if (!playbackFinished && !(currState == PlayerState::DecoderFailed))
+    if (!_playbackController.IsPlaybackFinished() && !(currState == PlayerState::DecoderFailed))
     {
         //This waits on the frame
         auto frame = _decoder.getFrame();
@@ -49,7 +49,7 @@ void App::Update(const double& timeBase)
         auto firstFramePTS = _decoder.getFirstFramePTS();
         if (frame)
         {
-            double currTime = std::chrono::duration<double>(Clock::now() - playbackStartTime).count();
+            double currTime = _playbackController.GetTimeSinceStart(); 
             //ensure we have a valid timestamp if possible
             auto currPTS = (frame->pts != AV_NOPTS_VALUE) ? frame->pts : frame->best_effort_timestamp;
             // calculate frame time based on offset from first frame pts, in case it's not equal to 0
@@ -66,7 +66,7 @@ void App::Update(const double& timeBase)
         }
         else {
             //Playback is done
-            playbackFinished = true;
+            _playbackController.SetPlaybackFinished(true); 
             gLogger.info("Playback finished");
         }
     }
@@ -92,21 +92,21 @@ void App::RunAppLoop() noexcept
         // opens stream and runs the decoding loop in a separate thread
         int err = RunDecoder();
         if (err != 0)
-            playbackFinished = true; //will display gray BG
+            _playbackController.SetPlaybackFinished(true); //will display gray BG
+
         
         //Initialize renderer mostly for now
         err = InitializeInternals();
         if (err != 0)
-            playbackFinished = true;
+            _playbackController.SetPlaybackFinished(true); 
         else
          _appRender.AdjustRenderSize();
     }
 
     // time base used to calculate frame time for display
-    playbackStartTime = Clock::now(); 
+    _playbackController.StartPlaybackTimer();
     double timeBase = _decoder.getVideoTimeBase(); 
     gLogger.debug("Video time base = {}", timeBase);
-
 
     while (!WindowShouldClose() && _appRender.IsStillRendering())
     {
@@ -115,12 +115,10 @@ void App::RunAppLoop() noexcept
         if (IsKeyPressed(KEY_R))
         {
             _decoder.seekFrame(0);
-            playbackFinished = false;
+            _playbackController.SetPlaybackFinished(false);
         }
         Update(timeBase);
     }
     
     _appRender.EndRender();
 }
-
-

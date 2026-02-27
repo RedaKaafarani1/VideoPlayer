@@ -1,5 +1,6 @@
 #pragma once
 
+#include "PlaybackController.h"
 #include "../render/Render.h"
 #include "../decoder/DecoderCore.h"
 
@@ -23,6 +24,5 @@ private:
     DecoderCore _decoder;
     std::unique_ptr<AVFrame, CustomDeleter> _lastFrame {nullptr};
     std::string _videoFileName = "resources/bbb_1080p.mp4";
-    Clock::time_point playbackStartTime;
-    bool playbackFinished = false;
+    PlaybackController _playbackController;
 };

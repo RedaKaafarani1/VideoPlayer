@@ -14,8 +14,12 @@ class Stream {
 public:
     Stream();
 
-    AVPacket* getPacket() const { return _packet.get(); }
-    AVFrame*  getFrame()  const { return _frame.get();  }
+    AVPacket* GetPacket() const { return _packet.get(); }
+    AVFrame*  GetFrame()  const { return _frame.get();  }
+    void ResetInternalState() {
+        _packet.reset();
+        _frame.reset();
+    }
 private:
     std::unique_ptr<AVPacket, CustomDeleter> _packet{nullptr};
     FramePtr _frame{nullptr};

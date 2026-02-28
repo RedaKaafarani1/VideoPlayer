@@ -56,7 +56,7 @@ Codec::Codec(AVFormatContext& formatCtx, const unsigned int streamIdx)
     gLogger.info("Finalized setting up codec with index {}", streamIdx);
 }
 
-int Codec::openCodec() const
+int Codec::OpenCodec() const
 {
     gLogger.info("Opening codec with index {}", _codecIdx);
     return avcodec_open2(_codecCtx.get(), _codec.get(), nullptr);

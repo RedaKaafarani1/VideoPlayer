@@ -1,4 +1,6 @@
 #include "DecoderCore.h"
+#include "Common.h"
+#include <stdexcept>
 
 int DecoderCore::openStream(const std::string& filename)
 {
@@ -12,6 +14,16 @@ int DecoderCore::openStream(const std::string& filename)
     FormatContextPtr.reset(tmp);
 
     setCodecParameters();
+
+    // open video codec
+    const auto& codec = codecsMap[CodecType::VideoCodec]; 
+    int ret = codec.OpenCodec(); 
+    if (ret < 0)
+    {
+        gLogger.error("Could not open codec of type CodecType::VideoCodec");
+        _state.store(PlayerState::DecoderFailed, std::memory_order_release);
+        return -1;
+    }
     return 0;
 }
 
@@ -19,21 +31,27 @@ void DecoderCore::setCodecParameters()
 {
     auto fmt = FormatContextPtr.get();
 
+    std::vector<Codec> codecs;
     for (unsigned int streamIdx = 0; streamIdx  < fmt->nb_streams; streamIdx++)
     {
         //Codec is fully initialized in the constructor
         codecs.emplace_back(Codec(*FormatContextPtr.get(), streamIdx));
+        codecsMap[codecs[streamIdx].GetCodecType()] = std::move(codecs[streamIdx]); 
     }
 }
 
 std::optional<std::reference_wrapper<const Codec>>
 DecoderCore::getCodecByType(CodecType codecType) const
 {
-    for (const auto& codec : codecs)
-        if (codec.getCodecType() == codecType)
-            return codec;
-
-    return std::nullopt;
+    std::optional<std::reference_wrapper<const Codec>> ret = std::nullopt;
+    try {
+        ret = codecsMap.at(codecType);
+    } catch (const std::out_of_range& e)
+    {
+        gLogger.error("Codec of type VideoCodec not found: {}", e.what());
+        ret = std::nullopt;
+    }
+    return ret;
 }
 
 int DecoderCore::readFrame(AVPacket& packet, const unsigned int codecIdx, AVCodecContext& codecCtx) const 
@@ -86,11 +104,11 @@ AVFrame* DecoderCore::decodeNextFrame(const Codec& codec)
     if (doneDecoding)
         return nullptr;
     
-    AVPacket* packet = stream.getPacket();
-    AVFrame* frame = stream.getFrame();
-    AVCodecContext* codecCtx = codec.getCodecContext();  
+    AVPacket* packet = stream.GetPacket();
+    AVFrame* frame = stream.GetFrame();
+    AVCodecContext* codecCtx = codec.GetCodecContext();  
 
-    unsigned int codecIdx = codec.getCodecIndex();
+    unsigned int codecIdx = codec.GetCodecIndex();
     
     int err;
 
@@ -163,6 +181,7 @@ AVFrame* DecoderCore::convertFrameToRGB(const AVFrame* const source)
 
     //copy pts which we will use for timing
     rgbFrame->pts = source->pts;
+    rgbFrame->best_effort_timestamp = source->best_effort_timestamp;
 
     swsCtx = sws_getCachedContext(
             swsCtx,
@@ -185,37 +204,24 @@ AVFrame* DecoderCore::convertFrameToRGB(const AVFrame* const source)
 
 void DecoderCore::decodeVideoStream(std::stop_token stopToken)
 {
+    const auto& codec = codecsMap.at(CodecType::VideoCodec);
     AVFrame* frame = nullptr;
-    auto codec = getCodecByType(CodecType::VideoCodec);
-    if (!codec)
-    {
-        gLogger.error("Could not get codec of type CodecType::VideoCodec");
-        _state.store(PlayerState::DecoderFailed, std::memory_order_release);
-        return;
-    }
-    
-    gLogger.info("Starting decoding process");
-    int ret = codec->get().openCodec(); 
-    if (ret < 0)
-    {
-        gLogger.error("Could not open codec of type CodecType::VideoCodec");
-        _state.store(PlayerState::DecoderFailed, std::memory_order_release);
-        return;
-    }
-
     while (!stopToken.stop_requested())
     {
         if (seekRequested.load(std::memory_order_acquire))
         {
-            std::scoped_lock lock(queueMutex);
-            while (!decodedRGBFrames.empty())
-                decodedRGBFrames.pop();
+            {
+                std::scoped_lock lock(queueMutex);
+                while (!decodedRGBFrames.empty())
+                    decodedRGBFrames.pop();
+            }
 
             gLogger.info("Seeking to position {}", seekPTS);
-            av_seek_frame(FormatContextPtr.get(), codec->get().getCodecIndex(), seekPTS, AVSEEK_FLAG_BACKWARD);
-            avcodec_flush_buffers(codec->get().getCodecContext());
+            av_seek_frame(FormatContextPtr.get(), codec.GetCodecIndex(), seekPTS, AVSEEK_FLAG_BACKWARD);
+            avcodec_flush_buffers(codec.GetCodecContext());
             doneDecoding = false;
             seekRequested.store(false, std::memory_order_release);
+            queueCondition.notify_all();
         }
 
         if (doneDecoding)
@@ -227,25 +233,25 @@ void DecoderCore::decodeVideoStream(std::stop_token stopToken)
             continue;
         } 
 
-        frame = decodeNextFrame(codec->get());
+        frame = decodeNextFrame(codec);
         if (!frame)
         {
             //doneDecoding should already be set if that's the case
             continue;
         }
         AVFrame* rgbFrame = convertFrameToRGB(frame);
+        //set this here when the mutex is locked, we will be using it in the app thread
+        // _firstFramePTS is not atomic since we synchronize on queueMutex
+        if (_firstFramePTS == AV_NOPTS_VALUE)
+        {
+            _firstFramePTS = frame->pts;
+            if (_firstFramePTS == AV_NOPTS_VALUE)
+                _firstFramePTS = frame->best_effort_timestamp; // fall back in case pts not available
+        }
         if (rgbFrame)
         {
             {
                 std::scoped_lock lock(queueMutex);
-                //set this here when the mutex is locked, we will be using it in the app thread
-                // _firstFramePTS is not atomic since we synchronize on queueMutex
-                if (_firstFramePTS == AV_NOPTS_VALUE)
-                {
-                        _firstFramePTS = frame->pts;
-                        if (_firstFramePTS == AV_NOPTS_VALUE)
-                            _firstFramePTS = frame->best_effort_timestamp; // fall back in case pts not available
-                }
                 decodedRGBFrames.emplace(
                         std::unique_ptr<AVFrame, CustomDeleter>(rgbFrame)
                 ); 
@@ -276,14 +282,8 @@ std::unique_ptr<AVFrame, CustomDeleter> DecoderCore::getFrame()
 
 double DecoderCore::getVideoTimeBase() const
 {
-    auto codec = getCodecByType(CodecType::VideoCodec);
-    if (!codec)
-    {
-        gLogger.error("Could not get codec of type CodecType::VideoCodec");
-        return -1.0;
-    }
-
-    return av_q2d(FormatContextPtr.get()->streams[codec->get().getCodecIndex()]->time_base);
+    const auto& codec = codecsMap.at(CodecType::VideoCodec); 
+    return av_q2d(FormatContextPtr.get()->streams[codec.GetCodecIndex()]->time_base);
 }
 
 void DecoderCore::seekFrame(int64_t pts) noexcept
@@ -294,4 +294,22 @@ void DecoderCore::seekFrame(int64_t pts) noexcept
         seekRequested.store(true, std::memory_order_release);
     }
     controlCondition.notify_one();
+}
+
+/*void DecoderCore::changeVideoFile(const std::string& filename)
+{
+    {
+        std::scoped_lock lock(controlMutex);
+        decoderCommand = DecoderCommand::ChangeVideo;
+    }
+    controlCondition.notify_one();
+}*/
+
+void DecoderCore::pushCommand(const DecoderCommand& decoderCommand)
+{
+    {
+        std::scoped_lock lock(commandMutex);
+        commandQueue.push(decoderCommand);
+    }
+    commandCondition.notify_one();
 }

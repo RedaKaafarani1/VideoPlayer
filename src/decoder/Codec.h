@@ -28,13 +28,19 @@ public:
 
     //These are here if ever needed for access to codec information
     //we don't really abstract away ffmpeg, but it's not really the goal
-    AVCodecParameters* getCodecParams()  const { return _codecParams.get(); }
-    AVCodecContext*    getCodecContext() const { return _codecCtx.get();    }
-    const AVCodec*     getCodec()        const { return _codec.get();       }
-    CodecType          getCodecType()    const { return _codecType;         }
-    unsigned int       getCodecIndex()   const { return _codecIdx;          }
+    AVCodecParameters* GetCodecParams()  const { return _codecParams.get(); }
+    AVCodecContext*    GetCodecContext() const { return _codecCtx.get();    }
+    const AVCodec*     GetCodec()        const { return _codec.get();       }
+    CodecType          GetCodecType()    const { return _codecType;         }
+    unsigned int       GetCodecIndex()   const { return _codecIdx;          }
 
-    int openCodec() const;       
+    int OpenCodec() const;       
+    void ResetInternalState() {
+        avcodec_flush_buffers(_codecCtx.get());
+        _codecParams.reset();
+        _codecCtx.reset();
+        _codec.reset();
+    }
 
 private:
     std::unique_ptr<AVCodecParameters, CustomDeleter> _codecParams{nullptr};

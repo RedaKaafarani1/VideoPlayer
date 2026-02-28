@@ -6,10 +6,24 @@
 #include <condition_variable>
 #include <queue>
 #include <mutex>
+#include <unordered_map>
 
 extern "C" {
 #include <libswscale/swscale.h>
 }
+
+enum class DecoderCommandType {
+    None,
+    DecodeVideo,
+    Stop,
+    Seek,
+};
+
+struct DecoderCommand {
+    DecoderCommandType type;
+    std::string videoFilename;
+    int64_t seekPTS = 0;
+};
 
 class DecoderCore {
 public:
@@ -23,7 +37,6 @@ public:
     };
 
     AVFormatContext* getFormatContext() const   { return FormatContextPtr.get(); }
-    const std::vector<Codec>& getCodecs() const { return codecs; } 
     double getVideoTimeBase() const;
 
     void startDecoding() 
@@ -38,12 +51,14 @@ public:
     }
 
     int openStream(const std::string& filename); 
+    void changeVideoFile(const std::string& filename);
     AVFrame* decodeNextFrame(const Codec& codec);
     AVFrame* convertFrameToRGB(const AVFrame* const yuvFrame);
     std::unique_ptr<AVFrame, CustomDeleter> getFrame();
     std::optional<std::reference_wrapper<const Codec>> getCodecByType(CodecType codecType) const;
     void seekFrame(int64_t pts) noexcept;
     int64_t getFirstFramePTS() const noexcept { return _firstFramePTS; }
+    void pushCommand(const DecoderCommand& decoderCommand);
 
 private:
     int readFrame(AVPacket& packet, const unsigned int codecIdx, AVCodecContext& codecCtx) const;
@@ -51,7 +66,7 @@ private:
     void decodeVideoStream(std::stop_token stopToken);
 
     std::unique_ptr<AVFormatContext, CustomDeleter> FormatContextPtr{nullptr};
-    std::vector<Codec> codecs;
+    std::unordered_map<CodecType, Codec> codecsMap;
     Stream stream{};
     bool doneDecoding = false;
     int64_t _firstFramePTS{ AV_NOPTS_VALUE };
@@ -68,4 +83,7 @@ private:
     int64_t seekPTS;
     std::mutex controlMutex;
     std::condition_variable controlCondition;
+    std::mutex commandMutex;
+    std::condition_variable commandCondition;
+    std::queue<DecoderCommand> commandQueue;
 };

@@ -1,6 +1,5 @@
 #include "App.h"
 #include "Common.h"
-#include <raylib.h>
 
 int App::InitializeInternals() noexcept
 {
@@ -12,7 +11,7 @@ int App::InitializeInternals() noexcept
     }
 
     //We assume codec context is available since the codec was returned
-    const auto& codecCtx = codec->get().getCodecContext();
+    const auto& codecCtx = codec->get().GetCodecContext();
     gLogger.info("Video width = {}, Video height = {}", codecCtx->width, codecCtx->height);
     _appRender.InitializeFrameTexture(codecCtx->width, codecCtx->height);
     return 0;
@@ -95,8 +94,6 @@ void App::RunAppLoop() noexcept
         int err = RunDecoder();
         if (err != 0)
             _playbackController.SetPlaybackFinished(true); //will display gray BG
-
-        
         //Initialize renderer mostly for now
         err = InitializeInternals();
         if (err != 0)
@@ -105,8 +102,8 @@ void App::RunAppLoop() noexcept
          _appRender.AdjustRenderSize();
     }
 
-    // time base used to calculate frame time for display
     _playbackController.StartPlaybackTimer();
+    // time base used to calculate frame time for display
     double timeBase = _decoder.getVideoTimeBase(); 
     gLogger.debug("Video time base = {}", timeBase);
 

@@ -5,6 +5,7 @@
 #include <format>
 #include <utility>
 #include <chrono>
+#include <mutex>
 
 class Logger {
 public:
@@ -75,13 +76,22 @@ private:
         {
             std::chrono::zoned_time localTime{std::chrono::current_zone(), std::chrono::system_clock::now()};
             auto timeStr = std::format("{:%FT%T}", localTime); 
-            _logFile <<timeStr<<":"
-                     <<"[" << logLevelToString(level) << "]"
-                     << std::format(fmt, std::forward<Args>(args)...) << "\n";
-            _logFile.flush();
+            std::string logMessage = std::format("{} [{}]{}\n",
+                                                  timeStr,
+                                                  logLevelToString(level),
+                                                  std::format(fmt, std::forward<Args>(args)...)
+                                                );
+            //synchronize writing to log file
+            {
+                std::scoped_lock lock(_writeMutex);
+                _logFile << logMessage;
+                //if (level >= LogLevel::ERROR)
+                    _logFile.flush();
+            }
         }
     }
     
     std::string _fileName;
+    std::mutex _writeMutex;
     std::ofstream _logFile; 
 };

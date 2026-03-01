@@ -1,5 +1,6 @@
 #include "Codec.h"
 #include "Common.h"
+#include "../logger/GLogger.h"
 
 Codec::Codec(AVFormatContext& formatCtx, const unsigned int streamIdx)
 {

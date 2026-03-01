@@ -1,4 +1,5 @@
 #include "Render.h"
+#include <raylib.h>
 
 void Render::InitializeFrameTexture(const int& width, const int& height) noexcept
 {
@@ -19,6 +20,8 @@ void Render::InitializeFrameTexture(const int& width, const int& height) noexcep
     //that windowSize is already set.
     renderWindow.destination = renderWindow.GetVideoDrawingRectangle();
 
+    if (renderWindow.frameTexture.id != 0)
+        UnloadTexture(renderWindow.frameTexture);
     renderWindow.frameTexture = LoadTextureFromImage(img);
 }
 

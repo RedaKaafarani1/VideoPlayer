@@ -1,8 +1,7 @@
 #pragma once
 
 #include "../Common.h"
-
-#include "../logger/GLogger.h"
+#include <memory>
 
 //forward declarations
 struct AVCodecParameters;
@@ -36,7 +35,6 @@ public:
 
     int OpenCodec() const;       
     void ResetInternalState() {
-        avcodec_flush_buffers(_codecCtx.get());
         _codecParams.reset();
         _codecCtx.reset();
         _codec.reset();

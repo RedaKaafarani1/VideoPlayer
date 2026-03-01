@@ -34,7 +34,7 @@ private:
 
     Clock::time_point _playbackStartTime;
     Clock::time_point _playbackPauseTime;
-    double _totalPausedTime{0};
+    double _totalPausedTime{0.0};
     bool _playbackFinished = false;
     bool _playbackPaused = false;
 

@@ -13,4 +13,8 @@ enum class CodecType {
 enum class PlayerState : uint8_t {
     None,
     DecoderFailed,
+    DecoderLoading,
+    DecoderReady,
+    DecoderWaiting,
+    DecoderDoneSeeking
 };

@@ -8,7 +8,10 @@ class App
 {
 public:
     using Clock = std::chrono::steady_clock;
-    App() : _appRender(WIDTH, HEIGHT), _decoder(_playerState) {}
+    App() : _appRender(WIDTH, HEIGHT), _decoder(_playerState) 
+    {
+        _decoder.pushCommand({DecoderCommandType::Wait, "", 0});
+    }
 
     void RunAppLoop() noexcept;
     int InitializeInternals() noexcept;
@@ -16,13 +19,14 @@ public:
     Render& GetAppRender() noexcept { return _appRender; }
     DecoderCore& GetDecoder() noexcept { return _decoder; }
 private:
-    int RunDecoder() noexcept;
     void Update(const double& timeBase);
+    void HandleVideoFileChange() noexcept;
+    void ReinitializeState() noexcept;
 
-    std::atomic<PlayerState> _playerState = PlayerState::None;
+    std::atomic<PlayerState> _playerState = PlayerState::DecoderWaiting;
     Render _appRender;
     DecoderCore _decoder;
     std::unique_ptr<AVFrame, CustomDeleter> _lastFrame {nullptr};
-    std::string _videoFileName = "resources/bbb_1080p.mp4";
     PlaybackController _playbackController;
+    double _timeBase;
 };

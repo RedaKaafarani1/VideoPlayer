@@ -131,10 +131,10 @@ AVFrame* DecoderCore::decodeNextFrame(const Codec& codec)
 
             //getFrame reads this, acquire the mutex before writing
             {
-                std::scoped_lock lock(queueMutex);
+                std::scoped_lock lock(_queueMutex);
                 doneDecoding = true;
             }
-            queueCondition.notify_all();
+            _queueCondition.notify_all();
             gLogger.info("Done decoding");
             return nullptr;
         }
@@ -145,10 +145,10 @@ AVFrame* DecoderCore::decodeNextFrame(const Codec& codec)
         } else if (err == AVERROR_EOF) {
             //no more output frames
             {
-                std::scoped_lock lock(queueMutex);
+                std::scoped_lock lock(_queueMutex);
                 doneDecoding = true;
             }
-            queueCondition.notify_all();
+            _queueCondition.notify_all();
             gLogger.info("Done decoding");
             return nullptr;
         } else if (err < 0) {
@@ -190,8 +190,8 @@ AVFrame* DecoderCore::convertFrameToRGB(const AVFrame* const source)
     rgbFrame->pts = source->pts;
     rgbFrame->best_effort_timestamp = source->best_effort_timestamp;
 
-    swsCtx = sws_getCachedContext(
-            swsCtx,
+    _swsCtx = sws_getCachedContext(
+            _swsCtx,
             source->width,
             source->height,
             static_cast<AVPixelFormat>(source->format),
@@ -204,7 +204,7 @@ AVFrame* DecoderCore::convertFrameToRGB(const AVFrame* const source)
             nullptr
             );
     
-    sws_scale(swsCtx, source->data, source->linesize, 0, source->height, rgbFrame->data, rgbFrame->linesize);
+    sws_scale(_swsCtx, source->data, source->linesize, 0, source->height, rgbFrame->data, rgbFrame->linesize);
 
     return rgbFrame;
 }
@@ -216,11 +216,11 @@ void DecoderCore::runDecoderLoop(std::stop_token stopToken)
     {
         DecoderCommand command;
         {
-            std::scoped_lock lock(commandMutex);
-            if (!commandQueue.empty())
+            std::scoped_lock lock(_commandMutex);
+            if (!_commandQueue.empty())
             {
-                command = commandQueue.front();
-                commandQueue.pop();
+                command = _commandQueue.front();
+                _commandQueue.pop();
             }
         }
 
@@ -233,9 +233,9 @@ void DecoderCore::runDecoderLoop(std::stop_token stopToken)
                 gLogger.info("Decoder entering wait state");
                 _state.store(PlayerState::DecoderWaiting, std::memory_order_release);
                 {
-                    std::unique_lock lock(commandMutex);
-                    commandCondition.wait(lock, [&](){
-                            return !commandQueue.empty() || 
+                    std::unique_lock lock(_commandMutex);
+                    _commandCondition.wait(lock, [&](){
+                            return !_commandQueue.empty() || 
                                     stopToken.stop_requested();
                     });
                     continue;
@@ -264,25 +264,25 @@ void DecoderCore::runDecoderLoop(std::stop_token stopToken)
         if (rgbFrame)
         {
             {
-                std::scoped_lock lock(queueMutex);
+                std::scoped_lock lock(_queueMutex);
                 //set this here when the mutex is locked, we will be using it in the app thread
-                // _firstFramePTS is not atomic since we synchronize on queueMutex
+                // _firstFramePTS is not atomic since we synchronize on _queueMutex
                 if (_firstFramePTS == AV_NOPTS_VALUE)
                 {
                     _firstFramePTS = frame->pts;
                     if (_firstFramePTS == AV_NOPTS_VALUE)
                         _firstFramePTS = frame->best_effort_timestamp; // fall back in case pts not available
                 }
-                decodedRGBFrames.emplace(
+                _decodedRGBFrames.emplace(
                         std::unique_ptr<AVFrame, CustomDeleter>(rgbFrame)
                 ); 
             }
-            queueCondition.notify_one();
+            _queueCondition.notify_one();
         }
     }
     // notify all conditions
-    queueCondition.notify_all();
-    commandCondition.notify_all();
+    _queueCondition.notify_all();
+    _commandCondition.notify_all();
     return; 
 }
     
@@ -290,13 +290,13 @@ std::unique_ptr<AVFrame, CustomDeleter> DecoderCore::getFrame()
 {
     if (_state.load(std::memory_order_acquire) == PlayerState::DecoderLoading)
         return nullptr;
-    std::unique_lock lock(queueMutex);
+    std::unique_lock lock(_queueMutex);
     //wait for a frame, done decoding or stop request
-    queueCondition.wait(lock, [&](){return !decodedRGBFrames.empty() || doneDecoding; });
-    if (!decodedRGBFrames.empty())
+    _queueCondition.wait(lock, [&](){return !_decodedRGBFrames.empty() || doneDecoding; });
+    if (!_decodedRGBFrames.empty())
     {
-        auto frame = std::move(decodedRGBFrames.front());
-        decodedRGBFrames.pop();
+        auto frame = std::move(_decodedRGBFrames.front());
+        _decodedRGBFrames.pop();
         return frame;
     }
     // no more frames to return, send nullptr to signal end
@@ -313,36 +313,39 @@ void DecoderCore::handleNewVideoFile(const std::string& filename)
 {
     doneDecoding = true;
     gLogger.info("Received new video file {}, resetting", filename);  
+    // For both lines below, the custom deleter will handle
+    // cleaning ffmpeg related stuff
     FormatContextPtr.reset();
     codecsMap.clear();
     _firstFramePTS = AV_NOPTS_VALUE;
+    //empty current decoded frames
     {
-        std::scoped_lock lock(queueMutex);
-        while (!decodedRGBFrames.empty())
-            decodedRGBFrames.pop();
+        std::scoped_lock lock(_queueMutex);
+        while (!_decodedRGBFrames.empty())
+            _decodedRGBFrames.pop();
     }
-    queueCondition.notify_all();
+    _queueCondition.notify_all();
     int ret = openStream(filename);
     if (ret != 0)
         gLogger.error("Failed to open file {} for decoding", filename);
-    commandCondition.notify_one();
+    _commandCondition.notify_one();
 }
 
 void DecoderCore::pushCommand(const DecoderCommand& decoderCommand)
 {
     {
-        std::scoped_lock lock(commandMutex);
-        commandQueue.push(decoderCommand);
+        std::scoped_lock lock(_commandMutex);
+        _commandQueue.push(decoderCommand);
     }
-    commandCondition.notify_one();
+    _commandCondition.notify_one();
 }
 
 void DecoderCore::handleSeek(const int seekPTS) noexcept
 {
     {
-        std::scoped_lock lock(queueMutex);
-        while (!decodedRGBFrames.empty())
-            decodedRGBFrames.pop();
+        std::scoped_lock lock(_queueMutex);
+        while (!_decodedRGBFrames.empty())
+            _decodedRGBFrames.pop();
     }
 
     const auto& codec = codecsMap.at(CodecType::VideoCodec);
@@ -351,6 +354,6 @@ void DecoderCore::handleSeek(const int seekPTS) noexcept
     av_seek_frame(FormatContextPtr.get(), codec.GetCodecIndex(), seekPTS, AVSEEK_FLAG_BACKWARD);
     avcodec_flush_buffers(codec.GetCodecContext());
     doneDecoding = false;
-    queueCondition.notify_all();
+    _queueCondition.notify_all();
     _state.store(PlayerState::DecoderDoneSeeking, std::memory_order_release);
 }

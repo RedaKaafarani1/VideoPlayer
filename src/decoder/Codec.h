@@ -34,12 +34,6 @@ public:
     unsigned int       GetCodecIndex()   const { return _codecIdx;          }
 
     int OpenCodec() const;       
-    void ResetInternalState() {
-        _codecParams.reset();
-        _codecCtx.reset();
-        _codec.reset();
-    }
-
 private:
     std::unique_ptr<AVCodecParameters, CustomDeleter> _codecParams{nullptr};
     std::unique_ptr<AVCodecContext, CustomDeleter> _codecCtx{nullptr};

@@ -133,12 +133,14 @@ void App::HandleVideoFileChange() noexcept
 
 void App::ReinitializeState() noexcept
 {
+    //reset this here since playback state can change if we have an 
+    //error later
     _playbackController.ResetInternalState();
     int err = InitializeInternals();
     if (err != 0)
         _playbackController.SetPlaybackFinished(true); 
     else
-     _appRender.AdjustRenderSize();
+     _appRender.AdjustRenderSize(); //player size adjusts to that of the video
 
     _timeBase = _decoder.getVideoTimeBase();
     gLogger.debug("Video time base = {}", _timeBase);

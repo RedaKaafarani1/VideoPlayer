@@ -1,9 +1,8 @@
 #include "DecoderCore.h"
-#include "Common.h"
-#include <atomic>
-#include <mutex>
-#include <stdexcept>
 #include "../logger/GLogger.h"
+#include <libavutil/avutil.h>
+#include <libavutil/mathematics.h>
+#include <libavutil/rational.h>
 
 int DecoderCore::openStream(const std::string& filename)
 {
@@ -25,9 +24,10 @@ int DecoderCore::openStream(const std::string& filename)
     if (ret < 0)
     {
         gLogger.error("Could not open codec of type CodecType::VideoCodec");
-        _state.store(PlayerState::DecoderFailed, std::memory_order_release);
+        _state.store(DecoderState::DecoderFailed, std::memory_order_release);
         return -1;
     }
+    computeFrameDuration(codec);
     doneDecoding = false;
     return 0;
 }
@@ -156,7 +156,7 @@ AVFrame* DecoderCore::decodeNextFrame(const Codec& codec)
             return nullptr;
         }
 
-        gLogger.info("Frame {} ({}) pts {} dts {} key_frame {}", av_get_picture_type_char(frame->pict_type), codecCtx->frame_num, frame->pts, frame->pkt_dts, (frame->flags & AV_FRAME_FLAG_KEY));
+        gLogger.debug("Frame {} ({}) pts {} dts {} key_frame {}", av_get_picture_type_char(frame->pict_type), codecCtx->frame_num, frame->pts, frame->pkt_dts, (frame->flags & AV_FRAME_FLAG_KEY));
         return frame;
     }
 }
@@ -188,7 +188,15 @@ AVFrame* DecoderCore::convertFrameToRGB(const AVFrame* const source)
 
     //copy pts which we will use for timing
     rgbFrame->pts = source->pts;
-    rgbFrame->best_effort_timestamp = source->best_effort_timestamp;
+    if (rgbFrame->pts == AV_NOPTS_VALUE)
+        rgbFrame->pts = source->pkt_dts;
+    if (rgbFrame->pts == AV_NOPTS_VALUE)
+        rgbFrame->pts = source->best_effort_timestamp;;
+    // use our internal frame duration calculation to estimate pts
+    if (rgbFrame->pts == AV_NOPTS_VALUE)
+        rgbFrame->pts = _lastPTS + _frameDuration;
+    //store last valid pts for next pts calculation when needed
+    _lastPTS = rgbFrame->pts;
 
     _swsCtx = sws_getCachedContext(
             _swsCtx,
@@ -231,7 +239,7 @@ void DecoderCore::runDecoderLoop(std::stop_token stopToken)
             case DecoderCommandType::Stop: return;
             case DecoderCommandType::Wait:
                 gLogger.info("Decoder entering wait state");
-                _state.store(PlayerState::DecoderWaiting, std::memory_order_release);
+                _state.store(DecoderState::DecoderWaiting, std::memory_order_release);
                 {
                     std::unique_lock lock(_commandMutex);
                     _commandCondition.wait(lock, [&](){
@@ -246,7 +254,7 @@ void DecoderCore::runDecoderLoop(std::stop_token stopToken)
                 break;
             case DecoderCommandType::DecodeVideo:
                 handleNewVideoFile(command.videoFilename);
-                _state.store(PlayerState::DecoderReady, std::memory_order_release);
+                _state.store(DecoderState::DecoderReady, std::memory_order_release);
                 break;
         }
        
@@ -271,6 +279,8 @@ void DecoderCore::runDecoderLoop(std::stop_token stopToken)
                 {
                     _firstFramePTS = frame->pts;
                     if (_firstFramePTS == AV_NOPTS_VALUE)
+                        _firstFramePTS = frame->pkt_dts;
+                    if (_firstFramePTS == AV_NOPTS_VALUE)
                         _firstFramePTS = frame->best_effort_timestamp; // fall back in case pts not available
                 }
                 _decodedRGBFrames.emplace(
@@ -288,7 +298,7 @@ void DecoderCore::runDecoderLoop(std::stop_token stopToken)
     
 std::unique_ptr<AVFrame, CustomDeleter> DecoderCore::getFrame()
 {
-    if (_state.load(std::memory_order_acquire) == PlayerState::DecoderLoading)
+    if (_state.load(std::memory_order_acquire) == DecoderState::DecoderLoading)
         return nullptr;
     std::unique_lock lock(_queueMutex);
     //wait for a frame, done decoding or stop request
@@ -348,12 +358,22 @@ void DecoderCore::handleSeek(const int seekPTS) noexcept
             _decodedRGBFrames.pop();
     }
 
-    const auto& codec = codecsMap.at(CodecType::VideoCodec);
+    auto& codec = codecsMap.at(CodecType::VideoCodec);
 
     gLogger.info("Seeking to position {}", seekPTS);
     av_seek_frame(FormatContextPtr.get(), codec.GetCodecIndex(), seekPTS, AVSEEK_FLAG_BACKWARD);
     avcodec_flush_buffers(codec.GetCodecContext());
     doneDecoding = false;
     _queueCondition.notify_all();
-    _state.store(PlayerState::DecoderDoneSeeking, std::memory_order_release);
+    _lastPTS = 0;
+    _state.store(DecoderState::DecoderDoneSeeking, std::memory_order_release);
+}
+
+void DecoderCore::computeFrameDuration(const Codec& codec) noexcept
+{
+    const auto& stream = FormatContextPtr.get()->streams[codec.GetCodecIndex()];
+    AVRational timeBase = stream->time_base;
+    AVRational frameRate = stream->avg_frame_rate;
+
+    _frameDuration = av_rescale_q(1, av_inv_q(frameRate), timeBase);
 }

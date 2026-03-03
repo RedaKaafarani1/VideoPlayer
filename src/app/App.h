@@ -23,7 +23,7 @@ private:
     void HandleVideoFileChange() noexcept;
     void ReinitializeState() noexcept;
 
-    std::atomic<PlayerState> _playerState = PlayerState::DecoderWaiting;
+    std::atomic<DecoderState> _playerState = DecoderState::DecoderWaiting;
     Render _appRender;
     DecoderCore _decoder;
     std::unique_ptr<AVFrame, CustomDeleter> _lastFrame {nullptr};

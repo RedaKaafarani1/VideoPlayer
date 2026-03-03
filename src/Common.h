@@ -10,7 +10,7 @@ enum class CodecType {
     AudioCodec
 };
 
-enum class PlayerState : uint8_t {
+enum class DecoderState : uint8_t {
     None,
     DecoderFailed,
     DecoderLoading,

@@ -29,7 +29,7 @@ struct DecoderCommand {
 
 class DecoderCore {
 public:
-    DecoderCore(std::atomic<PlayerState>& playerState) : _state(playerState) {}
+    DecoderCore(std::atomic<DecoderState>& playerState) : _state(playerState) {}
     ~DecoderCore() { 
         if (_swsCtx) sws_freeContext(_swsCtx);
         // object is being destroyed, notify all conditions so the thread can stop
@@ -56,6 +56,7 @@ public:
     double getVideoTimeBase() const;
     void pushCommand(const DecoderCommand& decoderCommand);
 
+
 private:
     int openStream(const std::string& filename); 
     int readFrame(AVPacket& packet, const unsigned int codecIdx, AVCodecContext& codecCtx) const;
@@ -64,13 +65,16 @@ private:
     void runDecoderLoop(std::stop_token stopToken);
     void handleSeek(const int seekPTS) noexcept;
     void handleNewVideoFile(const std::string& filename);
+    void computeFrameDuration(const Codec& codec) noexcept;
 
     std::unique_ptr<AVFormatContext, CustomDeleter> FormatContextPtr{nullptr};
     std::unordered_map<CodecType, Codec> codecsMap;
     Stream stream;
     bool doneDecoding = false;
     int64_t _firstFramePTS{ AV_NOPTS_VALUE };
-    std::atomic<PlayerState>& _state;
+    int64_t _frameDuration;
+    int64_t _lastPTS = 0;
+    std::atomic<DecoderState>& _state;
     std::jthread _decoderThread;
     SwsContext* _swsCtx = nullptr;
 

@@ -18,16 +18,16 @@ int App::InitializeInternals() noexcept
 
 void App::Update(const double& timeBase)
 {
-    PlayerState currState = _playerState.load(std::memory_order_acquire);
-    if (currState == PlayerState::DecoderDoneSeeking)
+    DecoderState currState = _playerState.load(std::memory_order_acquire);
+    if (currState == DecoderState::DecoderDoneSeeking)
     {
         //consume state
-        _playerState.store(PlayerState::None, std::memory_order_release);
+        _playerState.store(DecoderState::None, std::memory_order_release);
         _playbackController.ResetInternalState();
         _playbackController.StartPlaybackTimer();
     }
-    if (currState == PlayerState::DecoderLoading ||
-        currState == PlayerState::DecoderWaiting)
+    if (currState == DecoderState::DecoderLoading ||
+        currState == DecoderState::DecoderWaiting)
     {
         //Decoder is re-initializing after adding video file
         //or the app just started, the state will change on
@@ -36,15 +36,17 @@ void App::Update(const double& timeBase)
         return;
     }
 
-    if (currState == PlayerState::DecoderReady)
+    if (currState == DecoderState::DecoderReady)
     {
         //We just added a video file and the decoder 
         //has started the decoding process
         gLogger.info("Decoder is ready");
         ReinitializeState();
+        //consume the state
+        _playerState.store(DecoderState::None, std::memory_order_release);
     }
 
-    if (!_playbackController.IsPlaybackFinished() && !_playbackController.IsPlaybackPaused() && !(currState == PlayerState::DecoderFailed))
+    if (!_playbackController.IsPlaybackFinished() && !_playbackController.IsPlaybackPaused() && !(currState == DecoderState::DecoderFailed))
     {
         //This waits on the frame
         auto frame = _decoder.getFrame();
@@ -54,8 +56,7 @@ void App::Update(const double& timeBase)
         {
             // This function accounts for paused time
             double currTime = _playbackController.GetEffectivePlaybackTime(); 
-            //ensure we have a valid timestamp if possible
-            auto currPTS = (frame->pts != AV_NOPTS_VALUE) ? frame->pts : frame->best_effort_timestamp;
+            auto currPTS = frame->pts;
             // calculate frame time based on offset from first frame pts, in case it's not equal to 0
             double frameTime = (currPTS - firstFramePTS) * timeBase;
             double delay = frameTime - currTime;
@@ -103,6 +104,8 @@ void App::RunAppLoop() noexcept
         {
             //pause video while waiting for seek
             _playbackController.TogglePause();
+            //DecoderState will be DecoderDoneSeeking after command
+            //is processed
             _decoder.pushCommand({DecoderCommandType::Seek, "", 0});
         }
         // if playback is finished, logically we cannot pause
@@ -125,7 +128,7 @@ void App::HandleVideoFileChange() noexcept
         std::string videoFileName = filePathList.paths[0];
         gLogger.info("New video file dropped: ", videoFileName);
         //we assume the dropped file is a video file, ffmpeg will tell us anyway
-        _playerState.store(PlayerState::DecoderLoading, std::memory_order_release);
+        _playerState.store(DecoderState::DecoderLoading, std::memory_order_release);
         _decoder.pushCommand({DecoderCommandType::DecodeVideo, videoFileName, 0});
         UnloadDroppedFiles(filePathList);
    }
@@ -146,6 +149,4 @@ void App::ReinitializeState() noexcept
     gLogger.debug("Video time base = {}", _timeBase);
     _playbackController.StartPlaybackTimer();
     _lastFrame.reset();
-    //consume the state
-    _playerState.store(PlayerState::None, std::memory_order_release);
 }

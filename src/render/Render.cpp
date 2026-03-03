@@ -20,6 +20,7 @@ void Render::InitializeFrameTexture(const int& width, const int& height) noexcep
     //that windowSize is already set.
     renderWindow.destination = renderWindow.GetVideoDrawingRectangle();
 
+    //Reuse texture, if we had a previous video, unload first
     if (renderWindow.frameTexture.id != 0)
         UnloadTexture(renderWindow.frameTexture);
     renderWindow.frameTexture = LoadTextureFromImage(img);
@@ -39,7 +40,7 @@ void Render::BeginRender() noexcept
 {
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
 
-    InitWindow(renderWindow.windowSize.width, renderWindow.windowSize.height, "RTSP Player");
+    InitWindow(renderWindow.windowSize.width, renderWindow.windowSize.height, "Video Player");
 
     RenderWindow::Size monitor = GetMonitorSize();
     SetWindowMinSize(renderWindow.minWindowSize.width, renderWindow.minWindowSize.height);

@@ -1,5 +1,5 @@
 #include "DecoderCore.h"
-#include "../logger/GLogger.h"
+#include "../Logger/GLogger.h"
 #include <libavutil/avutil.h>
 #include <libavutil/mathematics.h>
 #include <libavutil/rational.h>
@@ -317,6 +317,12 @@ double DecoderCore::getVideoTimeBase() const
 {
     const auto& codec = codecsMap.at(CodecType::VideoCodec); 
     return av_q2d(FormatContextPtr.get()->streams[codec.GetCodecIndex()]->time_base);
+}
+
+double DecoderCore::getVideoDurationSeconds() const
+{
+    int64_t duration = FormatContextPtr.get()->duration;
+    return (duration / static_cast<double>(AV_TIME_BASE));
 }
 
 void DecoderCore::handleNewVideoFile(const std::string& filename)

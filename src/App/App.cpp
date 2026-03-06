@@ -1,4 +1,10 @@
 #include "App.h"
+#include "Common.h"
+
+inline void AdjustTimelineSizePosition(UI::Timeline& timeline, const Size newSize)
+{
+   timeline.AdjustSizePosition(newSize.width, newSize.height); 
+}
 
 int App::InitializeInternals() noexcept
 {
@@ -25,6 +31,7 @@ void App::Update(const double& timeBase)
         _playerState.store(DecoderState::None, std::memory_order_release);
         _playbackController.ResetInternalState();
         _playbackController.StartPlaybackTimer();
+        _lastVideoProgressUpdateTime = -1.0;
     }
     if (currState == DecoderState::DecoderLoading ||
         currState == DecoderState::DecoderWaiting)
@@ -68,10 +75,19 @@ void App::Update(const double& timeBase)
             //conserve last frame to display it indefinitely at the end
             _lastFrame = std::move(frame);
             _appRender.DrawFrame(_lastFrame.get()->data[0]);
+
+            double updateInterval = 0.2;
+            //if (static_cast<int>(currTime) != static_cast<int>(_lastVideoProgressUpdateTime))
+            if (currTime - _lastVideoProgressUpdateTime >= updateInterval)
+            {
+                _timeline.UpdateVideoProgess(currTime/_totalVideoDuration);
+                _lastVideoProgressUpdateTime = currTime;
+            }
         }
         else {
             //Playback is done
             _playbackController.SetPlaybackFinished(true); 
+            _timeline.UpdateVideoProgess(1.0);
             gLogger.info("Playback finished");
         }
     }
@@ -84,12 +100,15 @@ void App::Update(const double& timeBase)
         else
             _appRender.DrawFrame(nullptr);
     }
+
+    _appRender.DrawUIElement(_timeline);
 }
 
 void App::RunAppLoop() noexcept
 {
     // Initializes raylib related stuff 
     _appRender.BeginRender();
+    _timeline.AdjustSizePosition(WIDTH, HEIGHT);
 
     gLogger.info("Starting decoding process in separate thread");
     _decoder.startDecoderThread(); 
@@ -99,7 +118,10 @@ void App::RunAppLoop() noexcept
     {
         HandleVideoFileChange();
         if (IsWindowResized())
+        {
             _appRender.UpdateRLWindowSize();
+            AdjustTimelineSizePosition(_timeline, _appRender.GetWindowSize());
+        }
         if (IsKeyPressed(KEY_R))
         {
             //pause video while waiting for seek
@@ -143,10 +165,17 @@ void App::ReinitializeState() noexcept
     if (err != 0)
         _playbackController.SetPlaybackFinished(true); 
     else
-     _appRender.AdjustRenderSize(); //player size adjusts to that of the video
+    {
+        //player size adjusts to that of the video
+        _appRender.AdjustRenderSize(); 
+        AdjustTimelineSizePosition(_timeline, _appRender.GetWindowSize());
+    }
 
     _timeBase = _decoder.getVideoTimeBase();
     gLogger.debug("Video time base = {}", _timeBase);
+    _totalVideoDuration = _decoder.getVideoDurationSeconds();
+    gLogger.debug("Video duration: {}", _totalVideoDuration);
     _playbackController.StartPlaybackTimer();
     _lastFrame.reset();
+    _lastVideoProgressUpdateTime = -1.0;
 }

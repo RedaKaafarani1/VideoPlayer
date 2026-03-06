@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-constexpr const int WIDTH  = 1280;
-constexpr const int HEIGHT = 720;
+constexpr int WIDTH  = 1280;
+constexpr int HEIGHT = 720;
 
 enum class CodecType {
     VideoCodec,

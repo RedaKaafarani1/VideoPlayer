@@ -54,6 +54,7 @@ public:
     std::optional<std::reference_wrapper<const Codec>> getCodecByType(CodecType codecType) const;
     int64_t getFirstFramePTS() const noexcept { return _firstFramePTS; }
     double getVideoTimeBase() const;
+    double getVideoDurationSeconds() const;
     void pushCommand(const DecoderCommand& decoderCommand);
 
 

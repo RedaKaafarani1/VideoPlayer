@@ -1,5 +1,5 @@
 #include "Stream.h"
-#include "../logger/GLogger.h"
+#include "../Logger/GLogger.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>

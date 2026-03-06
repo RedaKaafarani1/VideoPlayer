@@ -1,14 +1,16 @@
 #pragma once
 
 #include "PlaybackController.h"
-#include "../render/Render.h"
-#include "../decoder/DecoderCore.h"
+#include "UI/Timeline.h"
+#include "Render/Render.h"
+#include "Decoder/DecoderCore.h"
+#include "UI/UICommon.h"
 
 class App
 {
 public:
     using Clock = std::chrono::steady_clock;
-    App() : _appRender(WIDTH, HEIGHT), _decoder(_playerState) 
+    App() : _appRender(WIDTH, HEIGHT, UI::TIMELINE_SIZE), _decoder(_playerState) 
     {
         _decoder.pushCommand({DecoderCommandType::Wait, "", 0});
     }
@@ -29,4 +31,7 @@ private:
     std::unique_ptr<AVFrame, CustomDeleter> _lastFrame {nullptr};
     PlaybackController _playbackController;
     double _timeBase;
+    double _totalVideoDuration;
+    double _lastVideoProgressUpdateTime = -1.0;
+    UI::Timeline _timeline;
 };

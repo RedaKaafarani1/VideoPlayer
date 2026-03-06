@@ -1,5 +1,12 @@
 #include "Render.h"
+#include "UI/UICommon.h"
 #include <raylib.h>
+
+Render::Render(const int width, const int height, const int unusableHeight) 
+{
+    renderWindow.SetRLWindowSize(width, height, unusableHeight);
+    isRendering = false;
+}
 
 void Render::InitializeFrameTexture(const int& width, const int& height) noexcept
 {
@@ -27,7 +34,7 @@ void Render::InitializeFrameTexture(const int& width, const int& height) noexcep
 }
 
 //helper function to get monitor size
-static Render::RenderWindow::Size GetMonitorSize()
+static Size GetMonitorSize()
 {
     int monitor = GetCurrentMonitor();
     return {
@@ -42,7 +49,7 @@ void Render::BeginRender() noexcept
 
     InitWindow(renderWindow.windowSize.width, renderWindow.windowSize.height, "Video Player");
 
-    RenderWindow::Size monitor = GetMonitorSize();
+    Size monitor = GetMonitorSize();
     SetWindowMinSize(renderWindow.minWindowSize.width, renderWindow.minWindowSize.height);
     SetWindowMaxSize(monitor.width, monitor.height);
 
@@ -59,7 +66,7 @@ void Render::EndRender() noexcept
 void Render::DrawFrame(const uint8_t* frameData)
 {
     BeginDrawing();
-    ClearBackground(GRAY);
+    ClearBackground(BLACK);
     if (frameData)
     {
         UpdateTexture(renderWindow.frameTexture, frameData);
@@ -76,11 +83,11 @@ void Render::DrawFrame(const uint8_t* frameData)
 
 void Render::UpdateRLWindowSize() noexcept
 {
-    RenderWindow::Size newSize;
+    Size newSize;
     newSize.width  = GetScreenWidth();
     newSize.height = GetScreenHeight();
 
-    renderWindow.SetRLWindowSize(newSize.width, newSize.height);
+    renderWindow.SetRLWindowSize(newSize.width, newSize.height, renderWindow.unusableHeight);
     //window size changed, update destination to scale video if needed
     renderWindow.destination = renderWindow.GetVideoDrawingRectangle();
 }
@@ -93,7 +100,7 @@ void Render::RenderWindow::AdjustRenderSize() noexcept
         videoSize.height <= monitorSize.height)
     {
         //update internal memory with window size
-        SetRLWindowSize(videoSize.width, videoSize.height);
+        SetRLWindowSize(videoSize.width, videoSize.height, unusableHeight);
         //change raylib window size
         SetWindowSize(videoSize.width, videoSize.height); 
         return;
@@ -109,25 +116,56 @@ void Render::RenderWindow::AdjustRenderSize() noexcept
                   static_cast<int>(videoSize.height*scale)
                  };
 
-    SetRLWindowSize(newSize.width, newSize.height);
+    SetRLWindowSize(newSize.width, newSize.height, unusableHeight);
     SetWindowSize(newSize.width, newSize.height);
 }
 
 Rectangle Render::RenderWindow::GetVideoDrawingRectangle() noexcept
 {
+    const int availableHeight = windowSize.height - unusableHeight;
+
     float scale = std::min(
             windowSize.width / ((1.0f) * videoSize.width),
-            windowSize.height / ((1.0f) * videoSize.height)
+            availableHeight / ((1.0f) * videoSize.height)
     );
     //only scale down
     scale = std::min(scale, 1.0f);
     float drawWidth = videoSize.width * scale;
-    float drawHeight = videoSize.height* scale;
+    float drawHeight = videoSize.height * scale;
 
-    //we want to center the video and draw it scaled down to drawWidth and drawHeight
     return {(windowSize.width*1.0f - drawWidth)/2.0f,
-            (windowSize.height*1.0f - drawHeight)/2.0f,
+            (availableHeight*1.0f - drawHeight)/2.0f,
             drawWidth,
             drawHeight
     };
+}
+
+inline Rectangle ToRLRectangle(const UI::Rect& rect)
+{
+    return Rectangle{rect.x, rect.y, rect.width, rect.height};
+}
+
+inline Color ToRLColor(const UI::Color& color)
+{
+    return Color{color.r, color.g, color.b, color.a};
+}
+
+void Render::DrawUIElement(const UI::UIElement& elem) noexcept
+{
+   Rectangle r = ToRLRectangle(elem.GetRectangle());
+   Color c = ToRLColor(elem.GetColor());
+
+   switch (elem.GetShape())
+   {
+        case UI::UIElementShape::Rectangle:
+           DrawRectangle(r.x, r.y, r.width, r.height, c); break;
+        case UI::UIElementShape::Circle:
+           break;
+        case::UI::UIElementShape::Triangle:
+           break;
+   }
+
+   // Draw children of a ui element if it got any
+   for (auto* c : elem.GetChildren())
+       DrawUIElement(*c);
 }

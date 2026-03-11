@@ -33,7 +33,7 @@ private:
     PlaybackController _playbackController;
     double _timeBase;
     double _totalVideoDuration;
-    double _lastVideoProgressUpdateTime = -1.0;
+    int _lastVideoProgressUpdateTime = -1;
     UI::Timeline _timeline;
     UI::Controls _controls;
 };

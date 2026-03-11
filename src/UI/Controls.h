@@ -7,9 +7,9 @@ namespace UI {
     class Button : public UIElement {
     public:
         Button(const Color& color) : 
-            UIElement(color) {}
+            UIElement(color) { SetType(UIElementType::Element); }
         Button(const Color& color, const std::string& asset) : 
-            UIElement(color, asset) {}
+            UIElement(color, asset) { SetType(UIElementType::Element); }
 
         void AdjustSizePosition(const int width, const int height) noexcept override; 
     };
@@ -18,6 +18,7 @@ namespace UI {
     public:
         Controls() { 
             _color = {0, 0, 0, 0};
+            SetType(UIElementType::Container);
             AddChild(std::make_unique<Button>(Color{}, "PlayButton"));
             AddChild(std::make_unique<Button>(Color{}, "StopButton"));
             AddChild(std::make_unique<Button>(Color{}, "ForwardButton"));

@@ -1,8 +1,5 @@
 #include "DecoderCore.h"
 #include "../Logger/GLogger.h"
-#include <libavutil/avutil.h>
-#include <libavutil/mathematics.h>
-#include <libavutil/rational.h>
 
 int DecoderCore::openStream(const std::string& filename)
 {

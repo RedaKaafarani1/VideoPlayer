@@ -33,7 +33,7 @@ void App::Update(const double& timeBase)
         _playerState.store(DecoderState::None, std::memory_order_release);
         _playbackController.ResetInternalState();
         _playbackController.StartPlaybackTimer();
-        _lastVideoProgressUpdateTime = -1.0;
+        _lastVideoProgressUpdateTime = -1;
     }
     if (currState == DecoderState::DecoderLoading ||
         currState == DecoderState::DecoderWaiting)
@@ -78,17 +78,23 @@ void App::Update(const double& timeBase)
             _lastFrame = std::move(frame);
             _appRender.DrawFrame(_lastFrame.get()->data[0]);
 
-            double updateInterval = 0.2;
-            if (currTime - _lastVideoProgressUpdateTime >= updateInterval)
+            // This updates seek bar
+            _timeline.UpdateVideoProgess(currTime, _totalVideoDuration);
+
+            //This updates the time/totaltime text display, we only
+            //want it to happen every second
+            int iCurrTime = static_cast<int>(currTime);
+            if (_lastVideoProgressUpdateTime != iCurrTime)
             {
-                _timeline.UpdateVideoProgess(currTime/_totalVideoDuration);
-                _lastVideoProgressUpdateTime = currTime;
+                _timeline.UpdateVideoTime(currTime, _totalVideoDuration, true);
+                _lastVideoProgressUpdateTime = iCurrTime;
             }
         }
         else {
             //Playback is done
             _playbackController.SetPlaybackFinished(true); 
-            _timeline.UpdateVideoProgess(1.0);
+            _timeline.UpdateVideoProgess(_totalVideoDuration, _totalVideoDuration);
+            _timeline.UpdateVideoTime(_totalVideoDuration, _totalVideoDuration, true);
             gLogger.info("Playback finished");
         }
     }
@@ -180,5 +186,5 @@ void App::ReinitializeState() noexcept
     gLogger.debug("Video duration: {}", _totalVideoDuration);
     _playbackController.StartPlaybackTimer();
     _lastFrame.reset();
-    _lastVideoProgressUpdateTime = -1.0;
+    _lastVideoProgressUpdateTime = -1;
 }

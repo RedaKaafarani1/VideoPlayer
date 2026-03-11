@@ -1,4 +1,5 @@
 #include "Render.h"
+#include "Logger/GLogger.h"
 #include "UI/UICommon.h"
 #include <raylib.h>
 
@@ -10,7 +11,7 @@ Render::Render(const int width, const int height, const int unusableHeight)
 
 void Render::LoadTextureMap() noexcept
 {
-    //load all used texture here
+    //load all used textures here
     _textureMap["SeekCircle"] = LoadTexture("resources/seek.png");
     _textureMap["PlayButton"] = LoadTexture("resources/play.png");
     _textureMap["StopButton"] = LoadTexture("resources/stop.png");
@@ -172,13 +173,32 @@ void Render::DrawUIElement(const UI::UIElement& elem) noexcept
     // if we have no texture, draw shape
     if (_textureMap.find(elemAsset) == _textureMap.end())
     {
-        DrawRectangle(r.x, r.y, r.width, r.height, c);
+        switch (elem.GetType())
+        {
+            case UI::UIElementType::Container:
+            case UI::UIElementType::Element:
+            {
+                auto ro = elem.GetRoundness();
+                if (ro)
+                    DrawRectangleRounded(r, ro, elem.GetSegments(), c);
+                else
+                    DrawRectangleRec(r, c);
+                break;
+            }
+            case UI::UIElementType::Text:
+            {
+                auto& uiTextElement = dynamic_cast<const UI::UIText&>(elem);
+                DrawText(uiTextElement.GetText().c_str(), r.x, r.y, uiTextElement.GetFontSize(), c);
+                break;
+            }
+            default: gLogger.error("Could not determine type of UIElement in Draw function");
+        }
     }
     else {
        DrawTexture(_textureMap.at(elemAsset), r.x, r.y, WHITE);
     }
 
     // Draw children of a ui element if it got any
-    for (auto* c : elem.GetChildren())
+    for (auto& c : elem.GetChildren())
        DrawUIElement(*c);
 }

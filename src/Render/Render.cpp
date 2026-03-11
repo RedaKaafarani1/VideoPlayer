@@ -8,6 +8,16 @@ Render::Render(const int width, const int height, const int unusableHeight)
     isRendering = false;
 }
 
+void Render::LoadTextureMap() noexcept
+{
+    //load all used texture here
+    _textureMap["SeekCircle"] = LoadTexture("resources/seek.png");
+    _textureMap["PlayButton"] = LoadTexture("resources/play.png");
+    _textureMap["StopButton"] = LoadTexture("resources/stop.png");
+    _textureMap["ForwardButton"] = LoadTexture("resources/forward.png");
+    _textureMap["RewindButton"] = LoadTexture("resources/rewind.png");
+}
+
 void Render::InitializeFrameTexture(const int& width, const int& height) noexcept
 {
     Image img;
@@ -53,12 +63,15 @@ void Render::BeginRender() noexcept
     SetWindowMinSize(renderWindow.minWindowSize.width, renderWindow.minWindowSize.height);
     SetWindowMaxSize(monitor.width, monitor.height);
 
+    LoadTextureMap();
     isRendering = true;
 }
 
 void Render::EndRender() noexcept
 {
     UnloadTexture(renderWindow.frameTexture); 
+    for(auto& tex : _textureMap)
+        UnloadTexture(tex.second);
     isRendering = false;
     CloseWindow();
 }
@@ -152,20 +165,20 @@ inline Color ToRLColor(const UI::Color& color)
 
 void Render::DrawUIElement(const UI::UIElement& elem) noexcept
 {
-   Rectangle r = ToRLRectangle(elem.GetRectangle());
-   Color c = ToRLColor(elem.GetColor());
+    Rectangle r = ToRLRectangle(elem.GetRectangle());
+    Color c = ToRLColor(elem.GetColor());
 
-   switch (elem.GetShape())
-   {
-        case UI::UIElementShape::Rectangle:
-           DrawRectangle(r.x, r.y, r.width, r.height, c); break;
-        case UI::UIElementShape::Circle:
-           break;
-        case::UI::UIElementShape::Triangle:
-           break;
-   }
+    auto elemAsset = elem.GetAsset();
+    // if we have no texture, draw shape
+    if (_textureMap.find(elemAsset) == _textureMap.end())
+    {
+        DrawRectangle(r.x, r.y, r.width, r.height, c);
+    }
+    else {
+       DrawTexture(_textureMap.at(elemAsset), r.x, r.y, WHITE);
+    }
 
-   // Draw children of a ui element if it got any
-   for (auto* c : elem.GetChildren())
+    // Draw children of a ui element if it got any
+    for (auto* c : elem.GetChildren())
        DrawUIElement(*c);
 }

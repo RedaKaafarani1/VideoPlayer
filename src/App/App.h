@@ -2,6 +2,7 @@
 
 #include "PlaybackController.h"
 #include "UI/Timeline.h"
+#include "UI/Controls.h"
 #include "Render/Render.h"
 #include "Decoder/DecoderCore.h"
 #include "UI/UICommon.h"
@@ -34,4 +35,5 @@ private:
     double _totalVideoDuration;
     double _lastVideoProgressUpdateTime = -1.0;
     UI::Timeline _timeline;
+    UI::Controls _controls;
 };

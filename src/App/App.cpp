@@ -1,9 +1,11 @@
 #include "App.h"
 #include "Common.h"
+#include "UI/Controls.h"
 
-inline void AdjustTimelineSizePosition(UI::Timeline& timeline, const Size newSize)
+inline void AdjustUISizePosition(UI::Timeline& timeline, UI::Controls& controls, const Size newSize)
 {
    timeline.AdjustSizePosition(newSize.width, newSize.height); 
+   controls.AdjustSizePosition(newSize.width, newSize.height); 
 }
 
 int App::InitializeInternals() noexcept
@@ -77,7 +79,6 @@ void App::Update(const double& timeBase)
             _appRender.DrawFrame(_lastFrame.get()->data[0]);
 
             double updateInterval = 0.2;
-            //if (static_cast<int>(currTime) != static_cast<int>(_lastVideoProgressUpdateTime))
             if (currTime - _lastVideoProgressUpdateTime >= updateInterval)
             {
                 _timeline.UpdateVideoProgess(currTime/_totalVideoDuration);
@@ -102,6 +103,7 @@ void App::Update(const double& timeBase)
     }
 
     _appRender.DrawUIElement(_timeline);
+    _appRender.DrawUIElement(_controls);
 }
 
 void App::RunAppLoop() noexcept
@@ -109,6 +111,7 @@ void App::RunAppLoop() noexcept
     // Initializes raylib related stuff 
     _appRender.BeginRender();
     _timeline.AdjustSizePosition(WIDTH, HEIGHT);
+    _controls.AdjustSizePosition(WIDTH, HEIGHT);
 
     gLogger.info("Starting decoding process in separate thread");
     _decoder.startDecoderThread(); 
@@ -120,7 +123,7 @@ void App::RunAppLoop() noexcept
         if (IsWindowResized())
         {
             _appRender.UpdateRLWindowSize();
-            AdjustTimelineSizePosition(_timeline, _appRender.GetWindowSize());
+            AdjustUISizePosition(_timeline, _controls, _appRender.GetWindowSize());
         }
         if (IsKeyPressed(KEY_R))
         {
@@ -168,7 +171,7 @@ void App::ReinitializeState() noexcept
     {
         //player size adjusts to that of the video
         _appRender.AdjustRenderSize(); 
-        AdjustTimelineSizePosition(_timeline, _appRender.GetWindowSize());
+        AdjustUISizePosition(_timeline, _controls, _appRender.GetWindowSize());
     }
 
     _timeBase = _decoder.getVideoTimeBase();

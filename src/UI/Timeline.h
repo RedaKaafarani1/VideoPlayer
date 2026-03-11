@@ -8,13 +8,11 @@ namespace UI {
     class Timeline : public UIContainer{
     public:
         Timeline() { 
-            _shape = UIElementShape::Rectangle;
-            _color = {130, 130, 130, 255};
-            AddChild(std::make_unique<Seek>(UIElementShape::Rectangle, Color{200, 200, 200, 255}));
-            AddChild(std::make_unique<Seek>(UIElementShape::Rectangle, Color{80, 80, 80, 255}));
+            _color = {50, 50, 50, 255};
+            AddChild(std::make_unique<Seek>(Color{90, 90, 90, 255}));
+            AddChild(std::make_unique<Seek>(Color{80, 80, 80, 255}, "SeekCircle"));
         };
         void AdjustSizePosition(const int width, const int height) noexcept override; 
-
         void UpdateVideoProgess(const double progress) noexcept
         {
             _videoProgress = progress; 

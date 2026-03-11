@@ -14,12 +14,15 @@ namespace UI {
 
         //seek rectangle where knob moves
         Seek* seek = dynamic_cast<Seek*>(children[0]);
-        seek->AdjustSizePosition(_rect.width - _rect.width/8.0f, _rect.height/4.0f);
-        auto seekWidth = seek->GetWidth();
+        seek->AdjustSizePosition(_rect.width - CONTROLS_WIDTH*2.0f, _rect.height/5.0f);
         auto seekHeight = seek->GetHeight();
-        seek->SetXPosition(_rect.x + (_rect.width - seekWidth)/2.0f);
+        seek->SetXPosition(_rect.x + CONTROLS_WIDTH);
         seek->SetYPosition(_rect.y + (_rect.height - seekHeight)/2.0f);
 
+        Seek* seekKnob = dynamic_cast<Seek*>(children[1]);
+        //20 here is the size of the seek circle, this is bad, I need a way to 
+        //get the size of the asset
+        seekKnob->AdjustSizePosition(20, 20);
         UpdateKnobPosition();
     }
 
@@ -33,8 +36,7 @@ namespace UI {
         auto seekHeight = seek->GetHeight();
 
         Seek* seekKnob = dynamic_cast<Seek*>(children[1]);
-        seekKnob->AdjustSizePosition(TIMELINE_SIZE/2.0f, TIMELINE_SIZE/2.0f);
-        seekKnob->SetXPosition(seekX + _videoProgress*seekWidth);
+        seekKnob->SetXPosition(seekX - seekKnob->GetWidth()/2 + _videoProgress*seekWidth);
         seekKnob->SetYPosition(seekY + (seekHeight - seekKnob->GetHeight())/2.0f);
     }
 }

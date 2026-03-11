@@ -4,7 +4,8 @@
 #include <vector>
 
 namespace UI {
-    constexpr int TIMELINE_SIZE = 26;
+    constexpr int TIMELINE_SIZE = 30;
+    constexpr int CONTROLS_WIDTH = 180;
 
     // This is used to not mix UI with render, i.e. to not import raylib
     struct Color {
@@ -22,30 +23,27 @@ namespace UI {
         float height;
     };
 
-    enum class UIElementShape {
-        Rectangle,
-        Circle,
-        Triangle
-    };
-
     class UIElement {
     public:
         UIElement() = default;
-        UIElement (const UIElementShape& shape, const Color& color) : 
-        _shape(shape), _color(color) {}
+        UIElement (const Color& color) : 
+        _color(color) {}
+
+        UIElement (const Color& color, const std::string& asset) : 
+        _color(color), _asset(asset) {}
 
         virtual ~UIElement() = default;
         virtual void AdjustSizePosition(const int width, const int height) noexcept = 0; 
 
         const Rect& GetRectangle() const { return _rect; };
-        const UIElementShape& GetShape() const { return _shape; };
         const Color& GetColor() const { return _color; };
         void SetXPosition(const int x) { _rect.x = x; };
-        int GetXPosition() const { return _rect.x; };
+        float GetXPosition() const { return _rect.x; };
         void SetYPosition(const int y) { _rect.y = y; };
-        int GetYPosition() const { return _rect.y; };
+        float GetYPosition() const { return _rect.y; };
         float GetWidth() const { return _rect.width; };
         float GetHeight() const { return _rect.height; };
+        const std::string& GetAsset() const { return _asset; };
 
         virtual const std::vector<UIElement*> GetChildren() const {
             std::vector<UIElement*> empty;
@@ -54,8 +52,8 @@ namespace UI {
 
     protected:
         Rect _rect;
-        UIElementShape _shape;
         Color _color;
+        std::string _asset = "";
     };
 
     class UIContainer : public UIElement {
@@ -69,7 +67,6 @@ namespace UI {
 
             const std::vector<UIElement*> GetChildren() const override {
                 std::vector<UIElement*> ret;
-                ret.clear();
                 for (auto& c : _children) ret.push_back(c.get());
                 return ret;
             }

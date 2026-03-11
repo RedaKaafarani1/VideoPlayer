@@ -3,6 +3,7 @@
 #include "raylib.h"
 #include "../Logger/GLogger.h"
 #include "UI/UICommon.h"
+#include <unordered_map>
 
 struct Size {
     int width;
@@ -61,7 +62,10 @@ private:
         // available video height, to account for UI
         int unusableHeight;
     };
+        
+    void LoadTextureMap() noexcept;
     
     bool isRendering;
     RenderWindow renderWindow;
+    std::unordered_map<std::string, Texture2D> _textureMap;
 };

@@ -24,6 +24,7 @@ public:
 private:
     void Update(const double& timeBase);
     void HandleVideoFileChange() noexcept;
+    void HandleUIStates() noexcept;
     void ReinitializeState() noexcept;
 
     std::atomic<DecoderState> _playerState = DecoderState::DecoderWaiting;

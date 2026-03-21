@@ -126,6 +126,7 @@ void App::RunAppLoop() noexcept
     while (!WindowShouldClose() && _appRender.IsStillRendering())
     {
         HandleVideoFileChange();
+        HandleUIStates();
         if (IsWindowResized())
         {
             _appRender.UpdateRLWindowSize();
@@ -163,6 +164,37 @@ void App::HandleVideoFileChange() noexcept
         _decoder.pushCommand({DecoderCommandType::DecodeVideo, videoFileName, 0});
         UnloadDroppedFiles(filePathList);
    }
+}
+
+bool IsElementHovered(const UI::Rect& rect)
+{
+   Vector2 mouse = GetMousePosition();
+   Rectangle raylibRect {rect.x, rect.y, rect.width, rect.height};
+   return CheckCollisionPointRec(mouse, raylibRect);
+}
+
+void HandleUIState(UI::UIContainer& container)
+{
+    for (auto& child : container.GetChildren())
+    {
+        auto childPtr = child.get();
+        if (bool isHovered = IsElementHovered(childPtr->GetRectangle());
+            isHovered == true)
+        {
+           childPtr->SetScale(1.1f); 
+        }
+        else
+        {
+            childPtr->SetScale(1.0f);
+        }
+    }
+}
+
+void App::HandleUIStates() noexcept
+{
+    //check if we are hovering a button and adjust scale accordingly
+    HandleUIState(_timeline);
+    HandleUIState(_controls);
 }
 
 void App::ReinitializeState() noexcept

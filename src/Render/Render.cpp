@@ -17,6 +17,9 @@ void Render::LoadTextureMap() noexcept
     _textureMap["StopButton"] = LoadTexture("resources/stop.png");
     _textureMap["ForwardButton"] = LoadTexture("resources/forward.png");
     _textureMap["RewindButton"] = LoadTexture("resources/rewind.png");
+
+    for (auto& tex : _textureMap)
+        SetTextureFilter(tex.second, TEXTURE_FILTER_BILINEAR);
 }
 
 void Render::InitializeFrameTexture(const int& width, const int& height) noexcept
@@ -164,6 +167,62 @@ inline Color ToRLColor(const UI::Color& color)
     return Color{color.r, color.g, color.b, color.a};
 }
 
+void Render::DrawScaledElement(const UI::UIElement& elem, const bool isAsset) noexcept
+{
+    float scale = elem.GetScale();
+    float width = elem.GetWidth();
+    float height = elem.GetHeight();
+    float x = elem.GetXPosition();
+    float y = elem.GetYPosition();
+
+    bool isRounded = elem.GetRoundness() != 0.0f ? true : false;
+
+    if (!isAsset)
+    {
+        Color color = ToRLColor(elem.GetColor());
+
+        Rectangle raylibRect {
+            x,
+            y,
+            width,
+            height
+        };
+
+        if (isRounded)
+        {
+            DrawRectangleRounded(raylibRect,
+                                 elem.GetRoundness(),
+                                 elem.GetSegments(),
+                                 color
+            );
+        }
+        else
+        {
+            DrawRectangleRec(raylibRect, color);
+        }
+    }
+    else
+    {
+        Rectangle src {0, 0, width, height};
+        Rectangle dst {
+            x + width  / 2.0f,
+            y + height / 2.0f,
+            width * scale,
+            height * scale,
+        };
+
+        Vector2 origin { dst.width / 2.0f, dst.height / 2.0f };
+
+        DrawTexturePro(_textureMap.at(elem.GetAsset()),
+                       src,
+                       dst,
+                       origin, 
+                       0.0f, 
+                       WHITE
+        );
+    }
+}
+
 void Render::DrawUIElement(const UI::UIElement& elem) noexcept
 {
     Rectangle r = ToRLRectangle(elem.GetRectangle());
@@ -178,11 +237,7 @@ void Render::DrawUIElement(const UI::UIElement& elem) noexcept
             case UI::UIElementType::Container:
             case UI::UIElementType::Element:
             {
-                auto ro = elem.GetRoundness();
-                if (ro)
-                    DrawRectangleRounded(r, ro, elem.GetSegments(), c);
-                else
-                    DrawRectangleRec(r, c);
+                DrawScaledElement(elem, false);
                 break;
             }
             case UI::UIElementType::Text:
@@ -195,7 +250,7 @@ void Render::DrawUIElement(const UI::UIElement& elem) noexcept
         }
     }
     else {
-       DrawTexture(_textureMap.at(elemAsset), r.x, r.y, WHITE);
+        DrawScaledElement(elem, true);
     }
 
     // Draw children of a ui element if it got any

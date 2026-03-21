@@ -63,6 +63,7 @@ private:
         int unusableHeight;
     };
         
+    void DrawScaledElement(const UI::UIElement& elem, const bool isAsset) noexcept;
     void LoadTextureMap() noexcept;
     
     bool isRendering;

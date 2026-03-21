@@ -105,5 +105,11 @@ namespace UI {
             {
                 return _children;
             }
+
+            void SetChildrenScale(const float scale) noexcept 
+            {
+                for (auto& child : _children)
+                    child.get()->SetScale(scale);
+            }
     };
 }

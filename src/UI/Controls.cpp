@@ -4,10 +4,10 @@ namespace UI {
 
     void Controls::AdjustSizePosition(const int width, const int height) noexcept
     { 
-        _rect.x = 0;
-        _rect.y = height - TIMELINE_SIZE;
-        _rect.width = CONTROLS_WIDTH;
-        _rect.height = TIMELINE_SIZE;
+        SetXPosition(0.0f);
+        SetYPosition(height - TIMELINE_SIZE);
+        SetWidth(CONTROLS_WIDTH);
+        SetHeight(TIMELINE_SIZE);
 
         auto& children = GetChildren();
 
@@ -34,8 +34,8 @@ namespace UI {
 
     void Button::AdjustSizePosition(const int width, const int height) noexcept
     {
-        _rect.width = width;
-        _rect.height = height;
+        SetWidth(width);
+        SetHeight(height);
     }
 
 }

@@ -31,9 +31,13 @@ namespace UI {
         Timeline() { 
             _color = {50, 50, 50, 255};
             SetType(UIElementType::Container);
+            //seek rectangle
             AddChild(std::make_unique<Seek>(Color{90, 90, 90, 255}));
+            //seek progress
             AddChild(std::make_unique<Seek>(Color{7, 38, 236, 255}));
+            //seek knob
             AddChild(std::make_unique<Seek>(Color{80, 80, 80, 255}, "SeekCircle"));
+            //Video time formatted as 00:00/00:00
             AddChild(std::make_unique<VideoTime>(Color{255, 255, 255, 255}, 16));
         };
         void AdjustSizePosition(const int width, const int height) noexcept override; 

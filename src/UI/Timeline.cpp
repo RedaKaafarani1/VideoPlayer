@@ -4,22 +4,22 @@
 namespace UI {
 
     void Seek::AdjustSizePosition(const int width, const int height) noexcept {
-        _rect.width = width; 
-        _rect.height = height;
-        //x and y will be in parent Timeline
+        SetWidth(width);
+        SetHeight(height);
+        //x and y will be updated in parent Timeline
     }
 
     void VideoTime::AdjustSizePosition(const int width, const int height) noexcept {
-        _rect.width = width; 
-        _rect.height = height;
+        SetWidth(width);
+        SetHeight(height);
     }
     
     void Timeline::AdjustSizePosition(const int width, const int height) noexcept
     {
-        _rect.x = 0;
-        _rect.y = height - TIMELINE_SIZE;
-        _rect.width = width;
-        _rect.height = TIMELINE_SIZE;
+        SetXPosition(0.0f);
+        SetYPosition(height - TIMELINE_SIZE);
+        SetWidth(width);
+        SetHeight(TIMELINE_SIZE);
 
         //seek rectangle where knob moves
         auto seek = _children[0].get();

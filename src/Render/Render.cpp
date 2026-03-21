@@ -199,6 +199,10 @@ void Render::DrawUIElement(const UI::UIElement& elem) noexcept
     }
 
     // Draw children of a ui element if it got any
-    for (auto& c : elem.GetChildren())
-       DrawUIElement(*c);
+    if (elem.GetType() == UI::UIElementType::Container)
+    {
+        auto& container = dynamic_cast<const UI::UIContainer&>(elem);
+        for (auto& c : container.GetChildren())
+           DrawUIElement(*c);
+    }
 }

@@ -1,7 +1,4 @@
 #include "Render.h"
-#include "Logger/GLogger.h"
-#include "UI/UICommon.h"
-#include <raylib.h>
 
 Render::Render(const int width, const int height, const int unusableHeight) 
 {
@@ -14,6 +11,7 @@ void Render::LoadTextureMap() noexcept
     //load all used textures here
     _textureMap["SeekCircle"] = LoadTexture("resources/seek.png");
     _textureMap["PlayButton"] = LoadTexture("resources/play.png");
+    _textureMap["PauseButton"] = LoadTexture("resources/pause.png");
     _textureMap["StopButton"] = LoadTexture("resources/stop.png");
     _textureMap["ForwardButton"] = LoadTexture("resources/forward.png");
     _textureMap["RewindButton"] = LoadTexture("resources/rewind.png");

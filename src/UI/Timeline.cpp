@@ -45,6 +45,8 @@ namespace UI {
 
         auto videoTime = dynamic_cast<UIText*>(_children[3].get()); 
         videoTime->AdjustSizePosition(100, videoTime->GetFontSize());
+        // use false here to only draw the text
+        // actual time gets updated elsewhere
         UpdateVideoTime(0.0, 0.0, false);
     }
 

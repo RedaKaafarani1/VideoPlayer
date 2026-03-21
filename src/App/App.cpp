@@ -1,6 +1,8 @@
 #include "App.h"
+#include "App/PlaybackController.h"
 #include "Common.h"
 #include "UI/Controls.h"
+#include <raylib.h>
 
 inline void AdjustUISizePosition(UI::Timeline& timeline, UI::Controls& controls, const Size newSize)
 {
@@ -173,19 +175,42 @@ bool IsElementHovered(const UI::Rect& rect)
    return CheckCollisionPointRec(mouse, raylibRect);
 }
 
-void HandleUIState(UI::UIContainer& container)
+void App::HandleButtonPress(UI::UIElement& button) noexcept
+{
+    auto asset = button.GetAsset();
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+    {
+        if (asset == "PlayButton" ||
+           asset == "PauseButton")
+           _playbackController.TogglePause();
+    }
+}
+
+void App::HandleUIState(UI::UIContainer& container) noexcept
 {
     for (auto& child : container.GetChildren())
     {
         auto childPtr = child.get();
+        auto asset = childPtr->GetAsset();
+
         if (bool isHovered = IsElementHovered(childPtr->GetRectangle());
             isHovered == true)
         {
            childPtr->SetScale(1.1f); 
+           HandleButtonPress(*child.get());
         }
         else
         {
             childPtr->SetScale(1.0f);
+        }
+
+        bool paused = _playbackController.IsPlaybackPaused();
+        if (asset == "PlayButton" || asset == "PauseButton")
+        {
+            if (!paused)
+                childPtr->SetAsset("PauseButton");
+            else 
+               childPtr->SetAsset("PlayButton");
         }
     }
 }

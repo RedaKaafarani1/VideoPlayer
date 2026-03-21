@@ -54,7 +54,6 @@ namespace UI {
         void UpdateSeekProgress() noexcept;
         //This is percentage for now 
         double _videoProgress = 0;
-        int _lastDisplayedSecond = -1;
     };
 
 

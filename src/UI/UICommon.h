@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <vector>
+#include <optional>
 
 namespace UI {
     constexpr int TIMELINE_SIZE = 30;
@@ -56,6 +57,7 @@ namespace UI {
         void SetHeight(const float height) noexcept { _rect.height = height; };  
         float GetHeight() const noexcept { return _rect.height; };
 
+        void SetAsset(const std::string& asset) { _asset = asset; }
         const std::string& GetAsset() const noexcept { return _asset; };
 
         void SetRoundness(const float r) noexcept { _rect.roundness = r; };
@@ -110,6 +112,19 @@ namespace UI {
             {
                 for (auto& child : _children)
                     child.get()->SetScale(scale);
+            }
+
+            std::optional<std::reference_wrapper<UIElement>> GetChildByName(const std::string& asset) noexcept
+            {
+                std::optional<std::reference_wrapper<UIElement>> ret = std::nullopt;
+                for (auto& child : _children)
+                {
+                    if (child.get()->GetAsset() == asset)
+                    {
+                        ret = *child.get();
+                    }
+                }
+                return ret;
             }
     };
 }

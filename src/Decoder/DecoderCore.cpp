@@ -366,7 +366,7 @@ void DecoderCore::pushCommand(const DecoderCommand& decoderCommand)
     _commandCondition.notify_one();
 }
 
-void DecoderCore::handleSeek(const int seekPTS) noexcept
+void DecoderCore::handleSeek(const int64_t seekPTS) noexcept
 {
     {
         std::scoped_lock lock(_queueMutex);

@@ -67,7 +67,7 @@ private:
     AVFrame* decodeNextFrame(const Codec& codec);
     void setCodecParameters();
     void runDecoderLoop(std::stop_token stopToken);
-    void handleSeek(const int seekPTS) noexcept;
+    void handleSeek(const int64_t seekPTS) noexcept;
     void handleNewVideoFile(const std::string& filename);
     void computeFrameDuration(const Codec& codec) noexcept;
     AVFrame* convertFrameToRGB(const AVFrame* const yuvFrame);

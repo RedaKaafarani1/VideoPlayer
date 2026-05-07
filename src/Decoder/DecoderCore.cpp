@@ -335,7 +335,6 @@ double DecoderCore::getVideoDurationSeconds() const
 
 void DecoderCore::handleNewVideoFile(const std::string& filename)
 {
-    doneDecoding = true;
     gLogger.info("Received new video file {}, resetting", filename);  
     // For both lines below, the custom deleter will handle
     // cleaning ffmpeg related stuff
@@ -345,6 +344,7 @@ void DecoderCore::handleNewVideoFile(const std::string& filename)
     //empty current decoded frames
     {
         std::scoped_lock lock(_queueMutex);
+        doneDecoding = true;
         while (!_decodedRGBFrames.empty())
             _decodedRGBFrames.pop();
     }
@@ -384,7 +384,10 @@ void DecoderCore::handleSeek(const int seekPTS) noexcept
         return;
     }
     avcodec_flush_buffers(codec.GetCodecContext());
-    doneDecoding = false;
+    {
+        std::scoped_lock lock(_queueMutex);
+        doneDecoding = false;
+    }
     _queueCondition.notify_all();
     _lastPTS = 0;
     _state.store(DecoderState::DecoderDoneSeeking, std::memory_order_release);

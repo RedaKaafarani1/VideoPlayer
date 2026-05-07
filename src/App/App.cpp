@@ -38,7 +38,7 @@ void App::Update(const double& timeBase)
         _lastVideoProgressUpdateTime = -1;
     }
     if (currState == DecoderState::DecoderLoading ||
-        currState == DecoderState::DecoderWaiting)
+        (currState == DecoderState::DecoderWaiting && !_playbackController.IsPlaybackFinished()))
     {
         //Decoder is re-initializing after adding video file
         //or the app just started, the state will change on
@@ -94,7 +94,8 @@ void App::Update(const double& timeBase)
         }
         else {
             //Playback is done
-            _playbackController.SetPlaybackFinished(true); 
+            _playbackController.SetPlaybackFinished(true);
+            _decoder.pushCommand({DecoderCommandType::Wait, "", 0});
             _timeline.UpdateVideoProgress(_totalVideoDuration, _totalVideoDuration);
             _timeline.UpdateVideoTime(_totalVideoDuration, _totalVideoDuration, true);
             gLogger.info("Playback finished");

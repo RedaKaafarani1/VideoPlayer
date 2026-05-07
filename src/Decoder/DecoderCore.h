@@ -52,7 +52,7 @@ public:
 
     std::unique_ptr<AVFrame, CustomDeleter> getFrame();
     std::optional<std::reference_wrapper<const Codec>> getCodecByType(CodecType codecType) const;
-    int64_t getFirstFramePTS() const noexcept { return _firstFramePTS; }
+    int64_t getFirstFramePTS() const noexcept { return _firstFramePTS.load(std::memory_order_acquire); }
     double getVideoTimeBase() const;
     double getVideoDurationSeconds() const;
     void pushCommand(const DecoderCommand& decoderCommand);
@@ -76,7 +76,7 @@ private:
     std::unordered_map<CodecType, Codec> _codecsMap;
     Stream _stream;
     bool doneDecoding = false;
-    int64_t _firstFramePTS{ AV_NOPTS_VALUE };
+    std::atomic<int64_t> _firstFramePTS{ AV_NOPTS_VALUE };
     int64_t _frameDuration;
     int64_t _lastPTS = 0;
     std::atomic<DecoderState> _state{DecoderState::DecoderWaiting};

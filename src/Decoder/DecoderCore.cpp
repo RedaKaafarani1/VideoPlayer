@@ -22,7 +22,7 @@ int DecoderCore::openStream(const std::string& filename)
     _stream = Stream{};
 
     // open video codec
-    const auto& codec = _codecsMap[CodecType::VideoCodec]; 
+    const auto& codec = _codecsMap.at(CodecType::VideoCodec);
     int ret = codec.OpenCodec(); 
     if (ret < 0)
     {
@@ -282,14 +282,13 @@ void DecoderCore::runDecoderLoop(std::stop_token stopToken)
             {
                 std::scoped_lock lock(_queueMutex);
                 //set this here when the mutex is locked, we will be using it in the app thread
-                // _firstFramePTS is not atomic since we synchronize on _queueMutex
-                if (_firstFramePTS == AV_NOPTS_VALUE)
+                if (_firstFramePTS.load(std::memory_order_acquire) == AV_NOPTS_VALUE)
                 {
-                    _firstFramePTS = frame->pts;
-                    if (_firstFramePTS == AV_NOPTS_VALUE)
-                        _firstFramePTS = frame->pkt_dts;
-                    if (_firstFramePTS == AV_NOPTS_VALUE)
-                        _firstFramePTS = frame->best_effort_timestamp; // fall back in case pts not available
+                    _firstFramePTS.store(frame->pts, std::memory_order_release);
+                    if (_firstFramePTS.load(std::memory_order_acquire) == AV_NOPTS_VALUE)
+                        _firstFramePTS.store(frame->pkt_dts, std::memory_order_release);
+                    if (_firstFramePTS.load(std::memory_order_acquire) == AV_NOPTS_VALUE)
+                        _firstFramePTS.store(frame->best_effort_timestamp, std::memory_order_release); // fall back in case pts not available
                 }
                 _decodedRGBFrames.emplace(
                         std::unique_ptr<AVFrame, CustomDeleter>(rgbFrame)
@@ -340,7 +339,7 @@ void DecoderCore::handleNewVideoFile(const std::string& filename)
     // cleaning ffmpeg related stuff
     _formatContextPtr.reset();
     _codecsMap.clear();
-    _firstFramePTS = AV_NOPTS_VALUE;
+    _firstFramePTS.store(AV_NOPTS_VALUE, std::memory_order_release);
     //empty current decoded frames
     {
         std::scoped_lock lock(_queueMutex);

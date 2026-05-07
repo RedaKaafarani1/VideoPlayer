@@ -9,14 +9,20 @@ int DecoderCore::openStream(const std::string& filename)
     {
         return -1;
     }
-    avformat_find_stream_info(tmp, nullptr);
-    FormatContextPtr.reset(tmp);
+    _formatContextPtr.reset(tmp);
+
+    if (avformat_find_stream_info(_formatContextPtr.get(), nullptr) < 0)
+    {
+        gLogger.error("Could not find stream info for {}", filename);
+        _formatContextPtr.reset();
+        return -1;
+    }
 
     setCodecParameters();
-    stream = Stream{};
+    _stream = Stream{};
 
     // open video codec
-    const auto& codec = codecsMap[CodecType::VideoCodec]; 
+    const auto& codec = _codecsMap[CodecType::VideoCodec]; 
     int ret = codec.OpenCodec(); 
     if (ret < 0)
     {
@@ -31,16 +37,16 @@ int DecoderCore::openStream(const std::string& filename)
 
 void DecoderCore::setCodecParameters()
 {
-    auto fmt = FormatContextPtr.get();
+    auto fmt = _formatContextPtr.get();
 
     std::vector<Codec> codecs;
-    if (!codecsMap.empty())
-        std::runtime_error("map not empty");
+    if (!_codecsMap.empty())
+        throw std::runtime_error("map not empty");
     for (unsigned int streamIdx = 0; streamIdx  < fmt->nb_streams; streamIdx++)
     {
         //Codec is fully initialized in the constructor
-        codecs.emplace_back(Codec(*FormatContextPtr.get(), streamIdx));
-        codecsMap[codecs[streamIdx].GetCodecType()] = std::move(codecs[streamIdx]); 
+        codecs.emplace_back(Codec(*_formatContextPtr.get(), streamIdx));
+        _codecsMap[codecs[streamIdx].GetCodecType()] = std::move(codecs[streamIdx]); 
     }
 }
 
@@ -49,7 +55,7 @@ DecoderCore::getCodecByType(CodecType codecType) const
 {
     std::optional<std::reference_wrapper<const Codec>> ret = std::nullopt;
     try {
-        ret = codecsMap.at(codecType);
+        ret = _codecsMap.at(codecType);
     } catch (const std::out_of_range& e)
     {
         gLogger.error("Codec of type VideoCodec not found: {}", e.what());
@@ -64,7 +70,7 @@ int DecoderCore::readFrame(AVPacket& packet, const unsigned int codecIdx, AVCode
 
     while (true)
     {
-        ret = av_read_frame(FormatContextPtr.get(), &packet);
+        ret = av_read_frame(_formatContextPtr.get(), &packet);
 
         // ret < 0 will be handled outside the while block 
         if (ret < 0) break;
@@ -108,8 +114,8 @@ AVFrame* DecoderCore::decodeNextFrame(const Codec& codec)
     if (doneDecoding)
         return nullptr;
     
-    AVPacket* packet = stream.GetPacket();
-    AVFrame* frame = stream.GetFrame();
+    AVPacket* packet = _stream.GetPacket();
+    AVFrame* frame = _stream.GetFrame();
     AVCodecContext* codecCtx = codec.GetCodecContext();  
 
     unsigned int codecIdx = codec.GetCodecIndex();
@@ -209,7 +215,12 @@ AVFrame* DecoderCore::convertFrameToRGB(const AVFrame* const source)
             nullptr
             );
     
-    sws_scale(_swsCtx, source->data, source->linesize, 0, source->height, rgbFrame->data, rgbFrame->linesize);
+    if (sws_scale(_swsCtx, source->data, source->linesize, 0, source->height, rgbFrame->data, rgbFrame->linesize) < 0)
+    {
+        gLogger.error("sws_scale failed");
+        av_frame_free(&rgbFrame);
+        return nullptr;
+    }
 
     return rgbFrame;
 }
@@ -257,7 +268,7 @@ void DecoderCore::runDecoderLoop(std::stop_token stopToken)
        
         //set codec here, since handleNewVideoFile invalidates current
         //codecs map
-        auto& codec = codecsMap.at(CodecType::VideoCodec);
+        auto& codec = _codecsMap.at(CodecType::VideoCodec);
 
         frame = decodeNextFrame(codec);
         if (!frame)
@@ -312,13 +323,13 @@ std::unique_ptr<AVFrame, CustomDeleter> DecoderCore::getFrame()
 
 double DecoderCore::getVideoTimeBase() const
 {
-    const auto& codec = codecsMap.at(CodecType::VideoCodec); 
-    return av_q2d(FormatContextPtr.get()->streams[codec.GetCodecIndex()]->time_base);
+    const auto& codec = _codecsMap.at(CodecType::VideoCodec); 
+    return av_q2d(_formatContextPtr.get()->streams[codec.GetCodecIndex()]->time_base);
 }
 
 double DecoderCore::getVideoDurationSeconds() const
 {
-    int64_t duration = FormatContextPtr.get()->duration;
+    int64_t duration = _formatContextPtr.get()->duration;
     return (duration / static_cast<double>(AV_TIME_BASE));
 }
 
@@ -328,8 +339,8 @@ void DecoderCore::handleNewVideoFile(const std::string& filename)
     gLogger.info("Received new video file {}, resetting", filename);  
     // For both lines below, the custom deleter will handle
     // cleaning ffmpeg related stuff
-    FormatContextPtr.reset();
-    codecsMap.clear();
+    _formatContextPtr.reset();
+    _codecsMap.clear();
     _firstFramePTS = AV_NOPTS_VALUE;
     //empty current decoded frames
     {
@@ -346,6 +357,8 @@ void DecoderCore::handleNewVideoFile(const std::string& filename)
 
 void DecoderCore::pushCommand(const DecoderCommand& decoderCommand)
 {
+    if (decoderCommand.type == DecoderCommandType::DecodeVideo)
+        _state.store(DecoderState::DecoderLoading, std::memory_order_release);
     {
         std::scoped_lock lock(_commandMutex);
         _commandQueue.push(decoderCommand);
@@ -361,10 +374,15 @@ void DecoderCore::handleSeek(const int seekPTS) noexcept
             _decodedRGBFrames.pop();
     }
 
-    auto& codec = codecsMap.at(CodecType::VideoCodec);
+    auto& codec = _codecsMap.at(CodecType::VideoCodec);
 
     gLogger.info("Seeking to position {}", seekPTS);
-    av_seek_frame(FormatContextPtr.get(), codec.GetCodecIndex(), seekPTS, AVSEEK_FLAG_BACKWARD);
+    if (av_seek_frame(_formatContextPtr.get(), codec.GetCodecIndex(), seekPTS, AVSEEK_FLAG_BACKWARD) < 0)
+    {
+        gLogger.error("av_seek_frame failed for position {}", seekPTS);
+        _state.store(DecoderState::DecoderFailed, std::memory_order_release);
+        return;
+    }
     avcodec_flush_buffers(codec.GetCodecContext());
     doneDecoding = false;
     _queueCondition.notify_all();
@@ -374,7 +392,7 @@ void DecoderCore::handleSeek(const int seekPTS) noexcept
 
 void DecoderCore::computeFrameDuration(const Codec& codec) noexcept
 {
-    const auto& stream = FormatContextPtr.get()->streams[codec.GetCodecIndex()];
+    const auto& stream = _formatContextPtr.get()->streams[codec.GetCodecIndex()];
     AVRational timeBase = stream->time_base;
     AVRational frameRate = stream->avg_frame_rate;
 

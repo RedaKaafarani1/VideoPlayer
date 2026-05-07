@@ -11,7 +11,7 @@ Stream::Stream()
     if (!packet)
     {
         gLogger.error("Could not allocate packet!");
-        std::runtime_error("Could not allocate packet");
+        throw std::runtime_error("Could not allocate packet");
     }
     _packet.reset(packet);
     
@@ -20,7 +20,7 @@ Stream::Stream()
     if (!frame)
     {
         gLogger.error("Could not allocate frame!");
-        std::runtime_error("Could not allocate frame");
+        throw std::runtime_error("Could not allocate frame");
     }
     _frame.reset(frame);
 }

@@ -10,14 +10,12 @@
 class App
 {
 public:
-    using Clock = std::chrono::steady_clock;
-    App() : _appRender(WIDTH, HEIGHT, UI::TIMELINE_SIZE), _decoder(_playerState) 
+    App() : _appRender(WIDTH, HEIGHT, UI::TIMELINE_SIZE)
     {
         _decoder.pushCommand({DecoderCommandType::Wait, "", 0});
     }
 
     void RunAppLoop() noexcept;
-    int InitializeInternals() noexcept;
     
     Render& GetAppRender() noexcept { return _appRender; }
     DecoderCore& GetDecoder() noexcept { return _decoder; }
@@ -28,8 +26,8 @@ private:
     void HandleUIState(UI::UIContainer& container) noexcept;
     void HandleButtonPress(UI::UIElement& button) noexcept;
     void ReinitializeState() noexcept;
+    int InitializeInternals() noexcept;
 
-    std::atomic<DecoderState> _playerState = DecoderState::DecoderWaiting;
     Render _appRender;
     DecoderCore _decoder;
     std::unique_ptr<AVFrame, CustomDeleter> _lastFrame {nullptr};

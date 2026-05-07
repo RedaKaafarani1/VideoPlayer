@@ -8,6 +8,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <optional>
+#include <atomic>
 
 extern "C" {
 #include <libswscale/swscale.h>
@@ -29,7 +30,7 @@ struct DecoderCommand {
 
 class DecoderCore {
 public:
-    DecoderCore(std::atomic<DecoderState>& playerState) : _state(playerState) {}
+    DecoderCore() = default;
     ~DecoderCore() { 
         if (_swsCtx) sws_freeContext(_swsCtx);
         // object is being destroyed, notify all conditions so the thread can stop
@@ -49,13 +50,15 @@ public:
         );
     }
 
-    AVFrame* convertFrameToRGB(const AVFrame* const yuvFrame);
     std::unique_ptr<AVFrame, CustomDeleter> getFrame();
     std::optional<std::reference_wrapper<const Codec>> getCodecByType(CodecType codecType) const;
     int64_t getFirstFramePTS() const noexcept { return _firstFramePTS; }
     double getVideoTimeBase() const;
     double getVideoDurationSeconds() const;
     void pushCommand(const DecoderCommand& decoderCommand);
+
+    DecoderState getState() const noexcept { return _state.load(std::memory_order_acquire); }
+    void clearState() noexcept { _state.store(DecoderState::None, std::memory_order_release); }
 
 
 private:
@@ -67,15 +70,16 @@ private:
     void handleSeek(const int seekPTS) noexcept;
     void handleNewVideoFile(const std::string& filename);
     void computeFrameDuration(const Codec& codec) noexcept;
+    AVFrame* convertFrameToRGB(const AVFrame* const yuvFrame);
 
-    std::unique_ptr<AVFormatContext, CustomDeleter> FormatContextPtr{nullptr};
-    std::unordered_map<CodecType, Codec> codecsMap;
-    Stream stream;
+    std::unique_ptr<AVFormatContext, CustomDeleter> _formatContextPtr{nullptr};
+    std::unordered_map<CodecType, Codec> _codecsMap;
+    Stream _stream;
     bool doneDecoding = false;
     int64_t _firstFramePTS{ AV_NOPTS_VALUE };
     int64_t _frameDuration;
     int64_t _lastPTS = 0;
-    std::atomic<DecoderState>& _state;
+    std::atomic<DecoderState> _state{DecoderState::DecoderWaiting};
     std::jthread _decoderThread;
     SwsContext* _swsCtx = nullptr;
 

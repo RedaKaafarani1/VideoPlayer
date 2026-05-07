@@ -42,7 +42,7 @@ namespace UI {
         };
         void AdjustSizePosition(const int width, const int height) noexcept override; 
         void UpdateVideoTime(const double progress, const double videoDuration, bool updateTime) noexcept;
-        void UpdateVideoProgess(const double progress, const double videoDuration) noexcept
+        void UpdateVideoProgress(const double progress, const double videoDuration) noexcept
         {
             _videoProgress = progress/videoDuration; 
             UpdateKnobPosition();

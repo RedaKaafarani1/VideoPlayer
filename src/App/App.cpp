@@ -28,11 +28,11 @@ int App::InitializeInternals() noexcept
 
 void App::Update(const double& timeBase)
 {
-    DecoderState currState = _playerState.load(std::memory_order_acquire);
+    DecoderState currState = _decoder.getState();
     if (currState == DecoderState::DecoderDoneSeeking)
     {
         //consume state
-        _playerState.store(DecoderState::None, std::memory_order_release);
+        _decoder.clearState();
         _playbackController.ResetInternalState();
         _playbackController.StartPlaybackTimer();
         _lastVideoProgressUpdateTime = -1;
@@ -54,7 +54,7 @@ void App::Update(const double& timeBase)
         gLogger.info("Decoder is ready");
         ReinitializeState();
         //consume the state
-        _playerState.store(DecoderState::None, std::memory_order_release);
+        _decoder.clearState();
     }
 
     if (!_playbackController.IsPlaybackFinished() && !_playbackController.IsPlaybackPaused() && !(currState == DecoderState::DecoderFailed))
@@ -81,7 +81,7 @@ void App::Update(const double& timeBase)
             _appRender.DrawFrame(_lastFrame.get()->data[0]);
 
             // This updates seek bar
-            _timeline.UpdateVideoProgess(currTime, _totalVideoDuration);
+            _timeline.UpdateVideoProgress(currTime, _totalVideoDuration);
 
             //This updates the time/totaltime text display, we only
             //want it to happen every second
@@ -95,7 +95,7 @@ void App::Update(const double& timeBase)
         else {
             //Playback is done
             _playbackController.SetPlaybackFinished(true); 
-            _timeline.UpdateVideoProgess(_totalVideoDuration, _totalVideoDuration);
+            _timeline.UpdateVideoProgress(_totalVideoDuration, _totalVideoDuration);
             _timeline.UpdateVideoTime(_totalVideoDuration, _totalVideoDuration, true);
             gLogger.info("Playback finished");
         }
@@ -124,10 +124,15 @@ void App::RunAppLoop() noexcept
     gLogger.info("Starting decoding process in separate thread");
     _decoder.startDecoderThread(); 
     //start the decoder in waiting state
+    bool sendFile = false;
 
     while (!WindowShouldClose() && _appRender.IsStillRendering())
     {
         HandleVideoFileChange();
+        if (!sendFile) {
+            _decoder.pushCommand({DecoderCommandType::DecodeVideo, "./sample-30s.mp4", 0});
+            sendFile = true;
+        }
         HandleUIStates();
         if (IsWindowResized())
         {
@@ -162,7 +167,6 @@ void App::HandleVideoFileChange() noexcept
         std::string videoFileName = filePathList.paths[0];
         gLogger.info("New video file dropped: ", videoFileName);
         //we assume the dropped file is a video file, ffmpeg will tell us anyway
-        _playerState.store(DecoderState::DecoderLoading, std::memory_order_release);
         _decoder.pushCommand({DecoderCommandType::DecodeVideo, videoFileName, 0});
         UnloadDroppedFiles(filePathList);
    }
@@ -194,7 +198,7 @@ void App::HandleUIState(UI::UIContainer& container) noexcept
         auto asset = childPtr->GetAsset();
 
         if (bool isHovered = IsElementHovered(childPtr->GetRectangle());
-            isHovered == true)
+            isHovered)
         {
            childPtr->SetScale(1.1f); 
            HandleButtonPress(*child.get());
